@@ -7,7 +7,7 @@
 from std.python import Python, PythonObject
 from std.python.bindings import PythonModuleBuilder
 from std.os import abort
-from db import connect, count_products, query_products, list_categories
+from db import connect, count_products, query_products, list_categories, list_sources
 from crawler import crawl as run_crawl
 
 comptime DEFAULT_MAX_PAGES = 3
@@ -22,6 +22,7 @@ def PyInit_api() -> PythonObject:
         m.def_function[crawl]("crawl")
         m.def_function[list_products]("list_products")
         m.def_function[categories]("categories")
+        m.def_function[sources]("sources")
         return m.finalize()
     except e:
         abort(String("error creating api module: ", e))
@@ -95,12 +96,18 @@ def list_products(db_path: PythonObject, params: PythonObject) raises -> PythonO
     var category = _get_str(params, "category")
     var min_price = _get_optional_float(params, "min_price")
     var max_price = _get_optional_float(params, "max_price")
+    var source_host = _get_str(params, "source_host")
     var page = _get_int(params, "page", 1)
     var page_size = _get_int(params, "page_size", 20)
 
-    return query_products(conn, search, category, min_price, max_price, page, page_size)
+    return query_products(conn, search, category, min_price, max_price, source_host, page, page_size)
 
 
 def categories(db_path: PythonObject) raises -> PythonObject:
     var conn = connect(String(db_path))
     return list_categories(conn)
+
+
+def sources(db_path: PythonObject) raises -> PythonObject:
+    var conn = connect(String(db_path))
+    return list_sources(conn)

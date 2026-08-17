@@ -34,14 +34,14 @@
 
 ## 3. Source attribution (storage + API)
 
-- [ ] 3.1 In `db.mojo`, derive a `source_host` value from the stored
+- [x] 3.1 In `db.mojo`, derive a `source_host` value from the stored
       `source_listing_url` in `query_products` (query-time, no schema
       change) and include it in each returned item.
-- [ ] 3.2 In `db.mojo`, accept an optional `source_host` filter in
+- [x] 3.2 In `db.mojo`, accept an optional `source_host` filter in
       `query_products` and apply it alongside the existing filters.
-- [ ] 3.3 Add a `list_sources` function to `db.mojo` returning the distinct
+- [x] 3.3 Add a `list_sources` function to `db.mojo` returning the distinct
       source hosts currently in the catalog (mirrors `list_categories`).
-- [ ] 3.4 Wire `source_host` filter and `list_sources` through
+- [x] 3.4 Wire `source_host` filter and `list_sources` through
       `api.mojo` (`list_products`, new `sources` export) and
       `backend/server.py` (`/api/products` query param, new
       `/api/sources` route).
@@ -56,12 +56,12 @@
 
 ## 5. Tests
 
-- [ ] 5.1 Add a Mojo test script exercising `textutil`/`html_extract`
+- [x] 5.1 Add a Mojo test script exercising `textutil`/`html_extract`
       against saved sample HTML fixtures: the real azurestandard.com
       SPA-shell page (false-positive class match must now be absent, and
       the SPA-shell note must fire) and the existing books.toscrape.com
       fixtures (extraction must still work unchanged).
-- [ ] 5.2 Add a small script/test exercising `db.query_products`'s new
+- [x] 5.2 Add a small script/test exercising `db.query_products`'s new
       `source_host` filter and `list_sources` against a temp SQLite DB with
       multi-site fixture data.
 - [ ] 5.3 Run the full `pixi run mojo run` / API smoke test suite and

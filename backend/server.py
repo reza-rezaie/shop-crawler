@@ -69,6 +69,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(200, api.list_products(DB_PATH, query))
             elif parsed.path == "/api/categories" and method == "GET":
                 self._send_json(200, api.categories(DB_PATH))
+            elif parsed.path == "/api/sources" and method == "GET":
+                self._send_json(200, api.sources(DB_PATH))
             elif parsed.path == "/api/crawl" and method == "POST":
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length) if length else b"{}"

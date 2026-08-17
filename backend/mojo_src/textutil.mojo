@@ -13,6 +13,21 @@ def is_digit(ch: String) -> Bool:
     return ch >= "0" and ch <= "9"
 
 
+def extract_host(url: String) -> String:
+    """Pull the `host[:port]` portion out of an absolute URL, e.g.
+    `https://www.example.com/shop/category/` -> `www.example.com`. Used to
+    attribute a stored product to the site it was crawled from without
+    needing a separate stored column (see db.mojo)."""
+    var scheme_end = url.find("://")
+    if scheme_end == -1:
+        return url
+    var host_start = scheme_end + 3
+    var path_start = url.find("/", host_start)
+    if path_start == -1:
+        return String(url[byte = host_start : url.byte_length()])
+    return String(url[byte = host_start : path_start])
+
+
 def to_lower_ascii(s: String) -> String:
     """ASCII-only lowercasing, used for case-insensitive keyword checks on
     short attribute values (class names etc.). Iterates by grapheme (Mojo's

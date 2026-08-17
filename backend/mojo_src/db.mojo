@@ -6,6 +6,7 @@
 from std.python import Python, PythonObject
 from models import Product
 from http_client import now_iso
+from textutil import extract_host
 
 comptime SCHEMA = """
 CREATE TABLE IF NOT EXISTS products (
@@ -132,12 +133,35 @@ def list_categories(conn: PythonObject) raises -> PythonObject:
     return out
 
 
+def list_sources(conn: PythonObject) raises -> PythonObject:
+    """Distinct site hosts currently represented in the catalog, derived
+    from source_listing_url (there is no separate stored column) -- lets
+    the browse view offer "which site is this from" as a filter, and lets
+    a user visually confirm which products came from which crawl instead
+    of everything blending into one undifferentiated list."""
+    var rows = conn.execute("SELECT DISTINCT source_listing_url FROM products").fetchall()
+    var seen = Dict[String, Bool]()
+    var hosts = List[String]()
+    for row in rows:
+        var host = extract_host(String(row["source_listing_url"]))
+        if host.byte_length() > 0 and host not in seen:
+            seen[host] = True
+            hosts.append(host)
+    sort(hosts)
+
+    var out = Python.list()
+    for host in hosts:
+        out.append(host)
+    return out
+
+
 def query_products(
     conn: PythonObject,
     search: String,
     category: String,
     min_price: Optional[Float64],
     max_price: Optional[Float64],
+    source_host: String,
     page: Int,
     page_size: Int,
 ) raises -> PythonObject:
@@ -163,6 +187,16 @@ def query_products(
     if max_price:
         where_clauses.append(String("price <= ?"))
         params.append(max_price.value())
+
+    if source_host.byte_length() > 0:
+        # source_listing_url is stored as a full URL, not a bare host, so
+        # match it as "<scheme>://<host>/..." or exactly "<scheme>://<host>".
+        where_clauses.append(
+            String("(source_listing_url LIKE ? OR source_listing_url = ? OR source_listing_url = ?)")
+        )
+        params.append("%://" + source_host + "/%")
+        params.append("http://" + source_host)
+        params.append("https://" + source_host)
 
     var where_sql = String("")
     if len(where_clauses) > 0:
@@ -204,6 +238,7 @@ def query_products(
         item["category"] = row["category"]
         item["description"] = row["description"]
         item["source_listing_url"] = row["source_listing_url"]
+        item["source_host"] = extract_host(String(row["source_listing_url"]))
         item["first_seen_at"] = row["first_seen_at"]
         item["last_seen_at"] = row["last_seen_at"]
         items.append(item)
