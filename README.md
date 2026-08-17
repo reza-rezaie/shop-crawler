@@ -60,6 +60,14 @@ backend/server.py --port 8010`).
    this pay no extra cost. Confirmed working end-to-end on a real
    AngularJS SPA (`https://www.azurestandard.com`); if it still finds
    nothing even after rendering, the crawl result says so.
+6. If a page has no products of its own but links to narrower category
+   pages (a "hub"/"browse" page on a site with a category tree — common
+   on larger stores), the crawl automatically follows a bounded number of
+   those links too, so pointing it at a high-level category can still
+   reach the real listings underneath it — all within the same "Max
+   pages" budget. If a crawled URL turns out not to be a real page on the
+   site at all (e.g. a typo'd or incomplete category URL), the crawl
+   result says that specifically, instead of a generic "found nothing."
 
 ### One-shot crawl without the UI
 
@@ -96,9 +104,16 @@ extraction, SQLite storage/filtering — see `openspec/specs/` and
   (for descriptions) remain raw-HTTP-only. A site whose listing needs
   scrolling/clicking to reveal products, or renders unusually slowly, may
   still come back with fewer or zero products.
+- Category drill-down (point 6 above) is a generic URL-path heuristic
+  ("same host, path nested under the current page's own path"), not tied
+  to any one site's markup — but it only ever follows links, so a site
+  whose category tree is driven by client-side filters/dropdowns with no
+  real per-category URL won't be reachable this way. Bounded by a
+  per-hub-page cap on how many child links get enqueued at once, plus the
+  existing overall page budget.
 - Development/testing crawled real-world sites in two cases, both kept
   minimal and robots.txt-permitted: `https://books.toscrape.com` (a public
   sandbox site built specifically for scraping practice) as the primary
-  target, and a small number of requests against
-  `https://www.azurestandard.com` while investigating and verifying a
-  reported bug and the JS-rendering fallback above.
+  target, and a modest number of requests against
+  `https://www.azurestandard.com` while investigating and verifying two
+  reported bugs, the JS-rendering fallback, and category drill-down above.

@@ -153,10 +153,27 @@ for the test site.
         products never pays this cost.
    - **Category**: breadcrumb `<ul class="breadcrumb">` last item, when
      present on the listing page.
+   - **Not-found detection**: if a page yields zero products, check
+     whether its content is itself a "not found"/404 page (a short
+     heading mentioning "not found" or "404") before anything else below
+     — reported distinctly, so an invalid/mistyped URL isn't confused
+     with a real page that legitimately has no products.
    - **Pagination**: look for `<link rel="next">`, then any element whose
      `class` contains "next" with a nested `href`; resolve relative to
      absolute via `urllib.parse.urljoin`; stop on no next link, repeated
      URL, or `max_pages`.
+   - **Category drill-down**: if a page (not a 404) yields zero products
+     of its own, look for same-host links whose URL path is nested under
+     the page's own path (e.g. `/shop/category/food/flour/22474` →
+     `/shop/category/food/flour/whole-wheat/22513`) and crawl a bounded
+     number of them the same way — lets a crawl started on a category
+     "hub" page (one that only links to narrower categories, common on
+     large e-commerce sites) reach the real listings underneath it.
+     Pagination pages and drill-down pages share one page-budget/dedup
+     queue (`max_pages` covers both). Verified end-to-end against a real
+     hub page on `https://www.azurestandard.com`: a category with zero
+     products of its own correctly drilled into several of its real
+     child categories and found real products in each.
 4. **Per product** (dedup'd by URL within the run): optionally fetch the
    detail page (`fetch_descriptions`, capped) to pull `description` and a
    more precise `category` from its breadcrumb.
@@ -170,10 +187,12 @@ for the test site.
 Everything under `backend/mojo_src/`:
 - `models.mojo` — `Product` struct and related value types.
 - `textutil.mojo` — byte-level string scanning helpers (find-all, tag/attr
-  extraction, depth-matched block extraction, whitespace/entity cleanup).
+  extraction, depth-matched block extraction, whitespace/entity cleanup,
+  URL path structure helpers used for category drill-down).
 - `pricing.mojo` — price-string → `(Float64, currency)` normalization.
 - `html_extract.mojo` — listing/detail page parsing, pagination + breadcrumb
-  discovery, using `textutil` (plus Python's `json` for the JSON-LD path).
+  + child-category-link + not-found-page discovery, using `textutil`
+  (plus Python's `json` for the JSON-LD path).
 - `http_client.mojo` — thin Mojo-side wrappers around `urllib`/`robotparser`
   calls (URL building, robots check, rate-limited fetch loop).
 - `browser_client.mojo` — the JS-rendering fallback: launches headless

@@ -28,6 +28,92 @@ def extract_host(url: String) -> String:
     return String(url[byte = host_start : path_start])
 
 
+def url_path(url: String) -> String:
+    """Path portion of an absolute URL, with any query string/fragment
+    stripped, e.g. `https://x.com/a/b?q=1#frag` -> `/a/b`. Returns `/` for
+    a bare host with no path."""
+    var scheme_end = url.find("://")
+    if scheme_end == -1:
+        return String("/")
+    var host_start = scheme_end + 3
+    var path_start = url.find("/", host_start)
+    if path_start == -1:
+        return String("/")
+    var rest = String(url[byte = path_start : url.byte_length()])
+    var q = rest.find("?")
+    if q != -1:
+        var trimmed = String(rest[byte = 0 : q])
+        rest = trimmed
+    var h = rest.find("#")
+    if h != -1:
+        var trimmed2 = String(rest[byte = 0 : h])
+        rest = trimmed2
+    if rest.byte_length() == 0:
+        return String("/")
+    return rest
+
+
+def url_path_stem(url: String) -> String:
+    """`url_path` with its last `/`-delimited segment removed, e.g.
+    `/shop/category/food/flour/22474` -> `/shop/category/food/flour`.
+    Used to find "child" category links: on a hierarchical
+    `/category/.../<id>` URL scheme, a child page's path has its parent's
+    stem as a prefix (see textutil.is_child_path)."""
+    var path = url_path(url)
+    var p = path
+    if p.byte_length() > 1:
+        var last_ch = String(p[byte = p.byte_length() - 1 : p.byte_length()])
+        if last_ch == "/":
+            var trimmed = String(p[byte = 0 : p.byte_length() - 1])
+            p = trimmed
+    var last_slash = p.rfind("/")
+    if last_slash <= 0:
+        return String("/")
+    return String(p[byte = 0 : last_slash])
+
+
+def is_child_path(candidate_url: String, current_url: String) -> Bool:
+    """Whether `candidate_url` looks like a "child" of `current_url` in a
+    hierarchical category-tree URL scheme: same host, and its path is
+    nested under the current page's own path stem. Generic URL-structure
+    heuristic -- no assumption about markup, class names, or any one
+    site's query-parameter conventions."""
+    if extract_host(candidate_url) != extract_host(current_url):
+        return False
+    var current_path = url_path(current_url)
+    var candidate_path = url_path(candidate_url)
+    if candidate_path == current_path:
+        return False
+    var stem = url_path_stem(current_url)
+    var prefix = stem + "/"
+    if stem == "/":
+        prefix = String("/")
+    return candidate_path.startswith(prefix)
+
+
+def find_all_anchor_hrefs(html: String) -> List[String]:
+    """Every `<a href="...">` value found anywhere on the page -- no
+    class/hint filter (unlike extract_blocks_by_class_hint), since
+    candidate child-category links have no consistent markup convention
+    to key off, only their own position in the URL hierarchy (see
+    is_child_path)."""
+    var out = List[String]()
+    var pos = 0
+    while True:
+        var open_idx = find_tag_open(html, "a", pos)
+        if open_idx == -1:
+            break
+        var open_end = html.find(">", open_idx)
+        if open_end == -1:
+            break
+        var tag_text = String(html[byte = open_idx : open_end + 1])
+        var href = extract_attr(tag_text, "href")
+        if href:
+            out.append(href.value())
+        pos = open_end + 1
+    return out^
+
+
 def to_lower_ascii(s: String) -> String:
     """ASCII-only lowercasing, used for case-insensitive keyword checks on
     short attribute values (class names etc.). Iterates by grapheme (Mojo's
