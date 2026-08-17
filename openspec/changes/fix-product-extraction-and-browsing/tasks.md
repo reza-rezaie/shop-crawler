@@ -11,15 +11,22 @@
 - [x] 1.3 Add/update unit-style test coverage (see section 5) proving the
       Angular `class="{ ... product.something }"` case no longer matches
       and a real `product_pod`/`product-item` class still does.
+- [x] 1.4 (found during implementation, see design.md) In `http_client.mojo`,
+      fix `can_fetch` to retrieve `robots.txt` with the crawler's own
+      User-Agent (via `fetch()`) and feed it to `RobotFileParser.parse()`,
+      instead of `RobotFileParser.read()` -- azurestandard.com's edge
+      403s `read()`'s unconfigurable default UA on `/robots.txt` itself,
+      which was silently blocking the entire crawl before extraction ever
+      ran.
 
 ## 2. SPA-shell detection and crawl reporting
 
-- [ ] 2.1 In `html_extract.mojo`, add a function that checks fetched HTML
+- [x] 2.1 In `html_extract.mojo`, add a function that checks fetched HTML
       for common client-rendered app-shell markers (`ng-app=`,
       `data-reactroot`, `id="root"`, `id="__next"`, `data-v-app`).
-- [ ] 2.2 In `crawler.mojo`, when a page's extraction yields zero products
+- [x] 2.2 In `crawler.mojo`, when a page's extraction yields zero products
       and the SPA-shell check matches, record a note for that page.
-- [ ] 2.3 Include collected per-page notes in the crawl summary returned by
+- [x] 2.3 Include collected per-page notes in the crawl summary returned by
       `crawler.crawl` / `api.crawl` (additive field, no breaking change to
       existing summary fields).
 - [ ] 2.4 Update `frontend/src/App.jsx` to display any crawl notes/warnings

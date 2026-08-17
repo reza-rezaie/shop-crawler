@@ -18,6 +18,16 @@ product data isn't in the fetched HTML at all. `extract_blocks_by_class_hint`'s
 element (an unrelated favorite/heart-icon widget) becomes a false-positive
 product-card candidate.
 
+Found while implementing the fix above: re-testing the fixed extractor
+against a *live* crawl of the same URL still produced zero pages crawled,
+because `can_fetch()` (`http_client.mojo`) reported the URL as disallowed
+by robots.txt. Root cause: `RobotFileParser.read()` fetches `robots.txt`
+via plain `urllib.request.urlopen()` with no way to set a User-Agent, and
+azurestandard.com's edge returns `403` for that bare default UA (confirmed:
+`curl` and a request using this crawler's own UA both get `robots.txt`
+with `200`). `read()` maps a `403`/`401` response to `disallow_all = True`,
+so the crawl was being blocked before extraction ever ran on the real page.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -38,6 +48,18 @@ product-card candidate.
   matching predicate within the heuristic strategy and attribute lookup.
 
 ## Decisions
+
+**robots.txt: fetch with our own UA, feed the text to `RobotFileParser.parse()`.**
+`can_fetch()` now calls this project's own `fetch()` (our descriptive UA,
+already used for every other request) to retrieve `robots.txt`, then passes
+the response body's lines to `RobotFileParser.parse()` instead of calling
+`RobotFileParser.read()`. `parse()` only interprets rule text; it does no
+fetching itself, so there's no separate UA to get blocked. A fetch failure
+(404, connection error, etc.) is treated as "no robots.txt" -> allowed,
+same as the previous behavior's intent. Alternative considered: subclass or
+monkeypatch `RobotFileParser`'s internal opener to inject a UA - rejected as
+more Python-interop surface for no benefit over just doing the fetch
+ourselves, which this project already has a function for.
 
 **Class-hint matching: whitespace-tokenize + character-class validate,
 done in Mojo, no new dependency.**
@@ -95,6 +117,11 @@ grid already is the browse view, it just needs attribution surfaced.
   class] → Accepted for this POC; the fix removes the concrete failure mode
   observed (punctuation-laden binding expressions), and heuristic scraping
   of arbitrary markup can never be 100% precise.
+- [robots.txt fetched with our own UA could itself be blocked by a host
+  that blocks *every* UA it doesn't recognize, not just urllib's default]
+  → Falls back to "allowed" exactly like the unreachable case, matching
+  standard robots.txt convention (missing/unreachable = allowed); no
+  behavior change from before this fix in that scenario.
 - [SPA-shell marker list is a fixed, incomplete set] → Documented as a
   heuristic in the spec (may under- or over-detect); acceptable because the
   fallback behavior (no note) is exactly today's behavior, so this only

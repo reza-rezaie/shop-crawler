@@ -7,6 +7,32 @@ crawler can actually see.
 
 ## ADDED Requirements
 
+### Requirement: robots.txt is evaluated using the crawler's own User-Agent
+Before fetching any page on a host, the system SHALL retrieve that host's
+`robots.txt` using the same descriptive User-Agent it uses for normal page
+requests, and SHALL evaluate crawl permission from that response. It SHALL
+NOT rely on a mechanism that fetches `robots.txt` with a different,
+unconfigurable User-Agent, since a host that only blocks that other
+User-Agent would then be incorrectly treated as disallowing the crawl
+entirely.
+
+#### Scenario: robots.txt reachable, no disallow for the target path
+- **WHEN** a host's `robots.txt` (fetched with the crawler's own
+  User-Agent) contains no rule disallowing the requested path for that
+  User-Agent (or for `*`)
+- **THEN** the crawl of that path SHALL proceed
+
+#### Scenario: robots.txt disallows the target path
+- **WHEN** a host's `robots.txt` disallows the requested path for the
+  crawler's User-Agent (or for `*`)
+- **THEN** the crawl SHALL be blocked and the crawl result SHALL report
+  that it was blocked by robots.txt
+
+#### Scenario: robots.txt unreachable
+- **WHEN** a host has no `robots.txt` or it cannot be fetched at all
+- **THEN** the crawl SHALL proceed, matching what a normal browser visit
+  to that host would experience
+
 ### Requirement: Product-card class matching uses whole class tokens
 When deciding whether an HTML element is a product-card candidate, the
 system SHALL match a class hint (e.g. "product") against individual

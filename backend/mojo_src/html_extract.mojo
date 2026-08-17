@@ -406,6 +406,33 @@ def extract_last_breadcrumb_items(html: String, count: Int) raises -> List[Strin
     return result^
 
 
+def _spa_shell_markers() -> List[String]:
+    var markers = List[String]()
+    markers.append(String("ng-app="))
+    markers.append(String("data-reactroot"))
+    markers.append(String('id="root"'))
+    markers.append(String('id="__next"'))
+    markers.append(String("data-v-app"))
+    return markers^
+
+
+def looks_like_client_rendered_app(html: String, product_count: Int) -> Bool:
+    """Heuristic: a page whose raw HTML carries a common client-side
+    framework's app-shell marker (Angular, React, Next.js, Vue) AND for
+    which extraction found zero products is likely rendering its real
+    content via JavaScript this crawler never executes -- rather than
+    the page genuinely having no products. Only meaningful when
+    `product_count` is 0; a page with real static product markup plus an
+    unrelated framework marker elsewhere is not flagged."""
+    if product_count > 0:
+        return False
+    var markers = _spa_shell_markers()
+    for marker in markers:
+        if marker in html:
+            return True
+    return False
+
+
 def extract_product_description(html: String) raises -> String:
     """Product detail page description: the visible text right after a
     "#product_description"-style heading, falling back to the first

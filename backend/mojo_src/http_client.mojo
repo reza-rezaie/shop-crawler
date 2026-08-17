@@ -40,20 +40,35 @@ def fetch(url: String) raises -> FetchResult:
 
 
 def can_fetch(url: String) raises -> Bool:
-    """Check the target host's robots.txt before crawling it."""
+    """Check the target host's robots.txt before crawling it.
+
+    Fetches robots.txt ourselves with `fetch()` (our descriptive User-Agent)
+    and feeds the text to `RobotFileParser.parse()`, rather than calling
+    `RobotFileParser.read()` directly. `read()` uses urllib's bare default
+    User-Agent with no way to override it, and some sites' anti-bot rules
+    403 that default UA on *every* path including robots.txt itself (even
+    though they serve the real page fine to a normal browser or to our
+    crawler's own UA) -- `read()` treats that 403 as "disallow everything",
+    which would incorrectly block a crawl the site never actually
+    disallows. See openspec/changes/fix-product-extraction-and-browsing/
+    for the concrete site this was found on."""
     var urlparse = Python.import_module("urllib.parse")
     var robotparser = Python.import_module("urllib.robotparser")
     try:
         var parts = urlparse.urlsplit(url)
         var robots_url = String(parts.scheme) + "://" + String(parts.netloc) + "/robots.txt"
+        var result = fetch(robots_url)
+        if not result.ok:
+            # No robots.txt / unreachable: default to allowed, matching
+            # what a normal browser visit would do.
+            return True
         var rp = robotparser.RobotFileParser()
         rp.set_url(robots_url)
-        rp.read()
+        var body_py = PythonObject(result.body)
+        rp.parse(body_py.splitlines())
         var allowed = rp.can_fetch(USER_AGENT, url)
         return Bool(allowed)
     except e:
-        # No robots.txt / unreachable: default to allowed, matching what a
-        # normal browser visit would do.
         return True
 
 

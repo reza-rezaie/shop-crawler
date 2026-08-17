@@ -15,6 +15,8 @@ scripts = ["scripts/activate.sh"]
 serve = "python backend/server.py"
 # One-shot crawl from the command line, without the web UI.
 crawl = "python backend/server.py --crawl-once"
+# Native-Mojo test suite (see backend/mojo_src/tests/).
+test = "bash scripts/run_tests.sh"
 # Frontend dev/build helpers (Node/npm, used only for the React UI).
 frontend-install = { cmd = "npm install", cwd = "frontend" }
 frontend-build = { cmd = "npm run build", cwd = "frontend" }

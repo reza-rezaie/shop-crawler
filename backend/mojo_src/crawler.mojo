@@ -15,6 +15,7 @@ from html_extract import (
     extract_breadcrumb_category,
     extract_last_breadcrumb_items,
     extract_product_description,
+    looks_like_client_rendered_app,
 )
 from db import upsert_product
 
@@ -31,6 +32,7 @@ def crawl(
     fetch_descriptions: Bool,
 ) raises -> PythonObject:
     var errors = Python.list()
+    var notes = Python.list()
 
     var capped_pages = max_pages
     if capped_pages < 1:
@@ -44,7 +46,7 @@ def crawl(
 
     if not can_fetch(seed_url):
         errors.append("Crawling this URL is disallowed by the site's robots.txt")
-        return _summary(seed_url, 0, 0, 0, 0, errors)
+        return _summary(seed_url, 0, 0, 0, 0, errors, notes)
 
     var seen_product_urls = Dict[String, Bool]()
     var visited_pages = Dict[String, Bool]()
@@ -69,6 +71,15 @@ def crawl(
         var products = extract_json_ld_products(result.body, current_url)
         if len(products) == 0:
             products = extract_heuristic_products(result.body, current_url, page_category)
+
+        if looks_like_client_rendered_app(result.body, len(products)):
+            notes.append(
+                current_url
+                + " found no product markup and looks like it renders its content"
+                + " with client-side JavaScript (an app-shell marker was found in the"
+                + " raw HTML). This crawler only fetches raw HTML, so it can't see"
+                + " content that page renders client-side."
+            )
 
         for p in products:
             var abs_url = resolve_url(current_url, p.url)
@@ -121,7 +132,7 @@ def crawl(
             updated += 1
         i += 1
 
-    return _summary(seed_url, pages_crawled, len(pending_products), created, updated, errors)
+    return _summary(seed_url, pages_crawled, len(pending_products), created, updated, errors, notes)
 
 
 def _summary(
@@ -131,6 +142,7 @@ def _summary(
     products_created: Int,
     products_updated: Int,
     errors: PythonObject,
+    notes: PythonObject,
 ) raises -> PythonObject:
     var summary = Python.dict()
     summary["seed_url"] = seed_url
@@ -139,4 +151,5 @@ def _summary(
     summary["products_created"] = products_created
     summary["products_updated"] = products_updated
     summary["errors"] = errors
+    summary["notes"] = notes
     return summary

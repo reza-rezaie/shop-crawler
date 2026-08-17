@@ -17,6 +17,18 @@ B": nothing shows which listing page or site each stored product was
 actually crawled from, and there's no dedicated way to browse/audit the
 full catalog by source to catch this.
 
+Found during implementation, same investigation: (3) robots.txt evaluation
+itself was broken for this exact site. `RobotFileParser.read()` fetches
+robots.txt with Python's bare default User-Agent (no way to override it),
+and azurestandard.com's edge/WAF returns 403 for that default UA on every
+path including `/robots.txt` — even though it serves the real page fine to
+a normal browser or to this crawler's own descriptive UA. `read()` treats
+that 403 as "disallow everything," so the crawl was being silently blocked
+before it ever reached the extraction bug above. Confirmed live: `curl`
+and a request using the crawler's own UA both get `robots.txt` with `200`
+and no rule disallowing `/shop/category/`; the same fetch with urllib's
+default UA gets `403`.
+
 ## What Changes
 
 - Tighten product-card detection so a `class` attribute only counts as a
@@ -33,6 +45,11 @@ full catalog by source to catch this.
   `data-reactroot`, `id="root"`/`id="__next"`, etc. with no matches from
   either extraction strategy) and report that explicitly in the crawl
   result instead of silently returning zero with no explanation.
+- Fetch `robots.txt` with the crawler's own descriptive User-Agent and feed
+  it to `RobotFileParser.parse()`, instead of `RobotFileParser.read()`
+  (which uses an unconfigurable default UA some sites' anti-bot rules
+  block), so a site that only blocks generic/default `urllib` requests
+  isn't misread as disallowing the whole crawl.
 - Store and expose which host/listing page each product was crawled from,
   and surface it in the UI: a dedicated "browse all crawled products" view
   groups/filters by source site so stale or cross-site data is immediately
@@ -58,6 +75,8 @@ None.
 - `backend/mojo_src/textutil.mojo`: class-token matching, attribute-name
   boundary matching.
 - `backend/mojo_src/html_extract.mojo`: SPA-shell detection.
+- `backend/mojo_src/http_client.mojo`: robots.txt fetched with our own UA
+  and parsed via `RobotFileParser.parse()` instead of `.read()`.
 - `backend/mojo_src/crawler.mojo`, `backend/mojo_src/api.mojo`: surface the
   new "no extractable products / likely JS-rendered" signal in the crawl
   summary.
