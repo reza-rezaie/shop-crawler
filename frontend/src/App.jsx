@@ -59,7 +59,7 @@ function ProductCard({ product }) {
 }
 
 export default function App() {
-  const [crawlUrl, setCrawlUrl] = useState('https://books.toscrape.com/')
+  const [crawlUrl, setCrawlUrl] = useState('')
   const [maxPages, setMaxPages] = useState(3)
   const [fetchDescriptions, setFetchDescriptions] = useState(true)
   const [crawling, setCrawling] = useState(false)
@@ -98,17 +98,33 @@ export default function App() {
     }
   }, [])
 
-  const loadProducts = useCallback(async () => {
+  // Accepts an optional overrides object so a caller (handleCrawl) can fetch
+  // with a filter value it just computed without waiting for that value to
+  // land in state first. Without this, calling setSourceHost(...) and then
+  // loadProducts() back-to-back is a race: this function's own closure still
+  // has the *old* sourceHost, so it can fetch and overwrite the display with
+  // stale unfiltered results *after* the state-driven effect's fresh fetch
+  // resolves, depending on which network request happens to finish last.
+  const loadProducts = useCallback(async (overrides = {}) => {
+    const effective = {
+      search,
+      category,
+      sourceHost,
+      minPrice,
+      maxPrice,
+      page,
+      ...overrides,
+    }
     setLoading(true)
     setLoadError(null)
     try {
       const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      if (category) params.set('category', category)
-      if (sourceHost) params.set('source_host', sourceHost)
-      if (minPrice) params.set('min_price', minPrice)
-      if (maxPrice) params.set('max_price', maxPrice)
-      params.set('page', String(page))
+      if (effective.search) params.set('search', effective.search)
+      if (effective.category) params.set('category', effective.category)
+      if (effective.sourceHost) params.set('source_host', effective.sourceHost)
+      if (effective.minPrice) params.set('min_price', effective.minPrice)
+      if (effective.maxPrice) params.set('max_price', effective.maxPrice)
+      params.set('page', String(effective.page))
       params.set('page_size', String(PAGE_SIZE))
       const data = await apiGet(`/api/products?${params.toString()}`)
       setItems(data.items)
@@ -157,9 +173,27 @@ export default function App() {
           message: `Crawled ${result.pages_crawled} page(s): ${result.products_created} new, ${result.products_updated} updated (${result.products_found} total found)${errSuffix}.`,
         })
         setCrawlNotes(result.notes || [])
+        // Narrow the browse view to the site just crawled. Without this,
+        // whatever was already in the catalog from an earlier crawl of a
+        // different site stays visible under the "All sites" filter,
+        // which reads as "I crawled X but it's showing Y" even though Y
+        // is just older, unrelated data.
+        let crawledHost = ''
+        try {
+          crawledHost = new URL(crawlUrl.trim()).host
+        } catch {
+          // Invalid URL would have already been rejected by the crawl
+          // request itself; nothing to narrow to in that case.
+        }
+        if (crawledHost) {
+          setSourceHost(crawledHost)
+          setPage(1)
+        }
         await loadCategories()
         await loadSources()
-        await loadProducts()
+        // Pass the freshly computed host explicitly rather than relying on
+        // `sourceHost` state (see loadProducts' comment for why).
+        await loadProducts({ sourceHost: crawledHost || sourceHost, page: 1 })
       }
     } catch (err) {
       setCrawlStatus({ type: 'error', message: err.message })
@@ -172,6 +206,18 @@ export default function App() {
     () => Math.max(1, Math.ceil(total / PAGE_SIZE)),
     [total],
   )
+
+  // Include the currently-applied source filter even if it isn't in
+  // `sources` yet (a site that was just crawled but yielded zero products
+  // has no rows to be "distinct" over, so /api/sources never lists it).
+  // Without this the dropdown would silently fall back to "All sites"
+  // while a filter is actually still applied, which is exactly the kind
+  // of "why am I not seeing what I expect" mismatch this filter exists to
+  // prevent.
+  const sourceOptions = useMemo(() => {
+    if (!sourceHost || sources.includes(sourceHost)) return sources
+    return [...sources, sourceHost].sort()
+  }, [sources, sourceHost])
 
   return (
     <div className="app">
@@ -249,7 +295,7 @@ export default function App() {
           title="Filter by which site a product was crawled from"
         >
           <option value="">All sites</option>
-          {sources.map((s) => (
+          {sourceOptions.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
