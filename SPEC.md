@@ -4,14 +4,19 @@ A proof-of-concept web app that crawls product listings from a shop/category
 page, stores them in SQLite, and lets you browse/search/filter them locally.
 Primary backend logic — crawling, HTML extraction, price parsing, filtering,
 and SQL access — is written in **native Mojo v1.0 GA**. Python is used only
-as a thin transport shim and for a handful of standard-library facilities
-Mojo does not yet provide.
+as a thin transport shim and for facilities Mojo does not yet provide —
+almost entirely its standard library, plus one third-party package
+(Playwright, for a JS-rendering fallback — see §6).
 
-Test target: **https://books.toscrape.com** — a public sandbox site built
-specifically for scraping practice (fictional bookstore, no robots.txt
+Primary test target: **https://books.toscrape.com** — a public sandbox site
+built specifically for scraping practice (fictional bookstore, no robots.txt
 restrictions, no login/anti-bot). The extractor is generic (see §4) but was
 tuned and verified end-to-end against this site, per the instruction to
-prioritize a working app over universal site support.
+prioritize a working app over universal site support. The class-token
+heuristic and JS-rendering fallback (§4) were additionally verified live
+against a real production site, **https://www.azurestandard.com** — a
+minimal, robots.txt-permitted set of requests made while investigating and
+fixing a reported bug.
 
 ## 1. Architecture
 
@@ -125,11 +130,27 @@ for the test site.
         implemented-but-not-live-tested.
      b. **Heuristic block scan** (the path actually exercised against
         books.toscrape.com) — find repeated container tags
-        (`<article>`/`<li>`/`<div>`) whose `class` attribute contains
-        "product", depth-match to the closing tag, then within each block
-        pull the first `<a href>` (product URL), the `<img alt/src>`
-        (name/image fallback), an `<h1>`–`<h6><a>` (name), and the first
-        currency-looking substring (price text).
+        (`<article>`/`<li>`/`<div>`) whose `class` attribute has a token
+        matching "product" (whole-token match, not a raw substring — a
+        JS-framework binding expression like
+        `class="{ 'x': product.y }"` isn't a real class and doesn't
+        count), depth-match to the closing tag, then within each block
+        pull the first `<a href>` (product URL), the `<img alt/src>` or
+        `ng-src` fallback (name/image fallback), an `<h1>`–`<h6><a>`
+        (name), and the first `<p>`/`<span>`/`<div>` with a price-hinted
+        class or currency-looking substring (price text).
+     c. **JS-rendering fallback** — if both strategies above find zero
+        products on a page AND its raw HTML carries a common client-side
+        app-shell marker (`ng-app`, `data-reactroot`, `id="root"`,
+        `id="__next"`, `data-v-app`), fetch the same URL again by actually
+        rendering it in headless Chromium (Playwright), and re-run
+        strategies (a)/(b) against the *rendered* HTML instead. Verified
+        end-to-end against `https://www.azurestandard.com` (an AngularJS
+        SPA with no product markup in its raw HTML at all): the real
+        product cards' rendered markup (`class="ProductGridItem ..."`)
+        matches the same class-token heuristic unchanged. Only triggered
+        for pages that need it — a page whose raw HTML already has
+        products never pays this cost.
    - **Category**: breadcrumb `<ul class="breadcrumb">` last item, when
      present on the listing page.
    - **Pagination**: look for `<link rel="next">`, then any element whose
@@ -155,12 +176,16 @@ Everything under `backend/mojo_src/`:
   discovery, using `textutil` (plus Python's `json` for the JSON-LD path).
 - `http_client.mojo` — thin Mojo-side wrappers around `urllib`/`robotparser`
   calls (URL building, robots check, rate-limited fetch loop).
+- `browser_client.mojo` — the JS-rendering fallback: launches headless
+  Chromium via Playwright, navigates, waits, returns rendered HTML in the
+  same shape `http_client.fetch` returns so callers don't special-case it.
 - `db.mojo` — schema init, upsert, filtered query building, category listing
   (SQL text assembly and control flow are Mojo; execution goes through
   Python's `sqlite3` via interop).
 - `crawler.mojo` — orchestrates the above into one crawl run.
-- `api.mojo` — the only file exporting a `PyInit_api()`; the four functions
-  Python calls (`health`, `crawl`, `list_products`, `list_categories`).
+- `api.mojo` — the only file exporting a `PyInit_api()`; the functions
+  Python calls (`health`, `crawl`, `list_products`, `categories`,
+  `sources`).
 
 This is essentially the entire backend: request handling logic, HTML
 parsing/extraction, price parsing, pagination, dedup/upsert decisions,
@@ -171,17 +196,18 @@ filtering/search query construction, and response shaping are all Mojo code.
 Mojo v1.0 GA has no stable stdlib modules for sockets/HTTP serving, an HTTP
 client, HTML/JSON parsing, or a database driver, so the following are Python
 standard library calls made *from inside Mojo* via `from std.python import
-Python; Python.import_module(...)` — no third-party Python packages:
+Python; Python.import_module(...)`:
 
-| Need | Python stdlib module used | Why not native Mojo |
+| Need | Python module used | Why not native Mojo |
 |---|---|---|
-| HTTP client requests | `urllib.request` | No stable Mojo HTTP client |
-| robots.txt check | `urllib.robotparser` | Reuse a correct, well-tested parser rather than reimplement |
-| URL joining | `urllib.parse` | No stable Mojo URL library |
-| JSON-LD parsing | `json` | No native Mojo JSON parser yet |
-| HTML entity unescaping | `html` (`html.unescape`) | Small stdlib convenience, avoids reimplementing entity tables |
-| Storage | `sqlite3` | No native Mojo SQLite driver |
-| Rate-limit delay | `time.sleep` | No stable Mojo sleep primitive exposed for this use |
+| HTTP client requests | `urllib.request` (stdlib) | No stable Mojo HTTP client |
+| robots.txt check | `urllib.robotparser` (stdlib) | Reuse a correct, well-tested parser rather than reimplement |
+| URL joining | `urllib.parse` (stdlib) | No stable Mojo URL library |
+| JSON-LD parsing | `json` (stdlib) | No native Mojo JSON parser yet |
+| HTML entity unescaping | `html` (`html.unescape`, stdlib) | Small stdlib convenience, avoids reimplementing entity tables |
+| Storage | `sqlite3` (stdlib) | No native Mojo SQLite driver |
+| Rate-limit delay | `time.sleep` (stdlib) | No stable Mojo sleep primitive exposed for this use |
+| JS-rendering fallback | `playwright.sync_api` (**the one third-party Python package**, `playwright-python` via Pixi) | No Mojo (or pure-HTTP) way to execute a page's client-side JavaScript; isolated entirely to `browser_client.mojo`, only invoked as a fallback for pages that need it |
 
 Separately, `backend/server.py` is a **plain Python file**, not Mojo calling
 out — it exists because Mojo 1.0 GA has no mature HTTP *server* library
@@ -229,5 +255,7 @@ dependencies are declared because only the standard library is used.
 - **Synchronous crawl endpoint** with page/detail-fetch caps, rather than a
   background job queue — simplest thing that works for a POC against a
   small test site.
-- Only the standard library is needed on the Python side, so no
-  `[pypi-dependencies]`/extra Pixi Python deps were added.
+- Only the standard library was needed on the Python side at first; the
+  JS-rendering fallback later added the one third-party dependency this
+  project has (`playwright-python`, via Pixi's regular `[dependencies]` —
+  it's a Conda package, not a `[pypi-dependencies]` one).

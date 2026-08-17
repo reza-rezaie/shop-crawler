@@ -8,6 +8,7 @@
 from std.python import Python, PythonObject
 from models import Product
 from http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
+from browser_client import render_fetch
 from html_extract import (
     extract_json_ld_products,
     extract_heuristic_products,
@@ -72,14 +73,48 @@ def crawl(
         if len(products) == 0:
             products = extract_heuristic_products(result.body, current_url, page_category)
 
+        # Pagination is normally discovered from the raw HTML; if the JS
+        # rendering fallback below finds real content, its rendered HTML
+        # (which contains everything the raw HTML had, plus what JS added)
+        # replaces it so pagination links added client-side aren't missed.
+        var pagination_source = result.body
+
         if looks_like_client_rendered_app(result.body, len(products)):
-            notes.append(
-                current_url
-                + " found no product markup and looks like it renders its content"
-                + " with client-side JavaScript (an app-shell marker was found in the"
-                + " raw HTML). This crawler only fetches raw HTML, so it can't see"
-                + " content that page renders client-side."
-            )
+            var rendered = render_fetch(current_url)
+            if not rendered.ok:
+                notes.append(
+                    current_url
+                    + " found no product markup and looks like it needs JavaScript"
+                    + " rendering, but rendering it failed: "
+                    + rendered.error
+                )
+            else:
+                var rendered_category = extract_breadcrumb_category(rendered.body)
+                if rendered_category.byte_length() > 0:
+                    page_category = rendered_category
+
+                var rendered_products = extract_json_ld_products(rendered.body, current_url)
+                if len(rendered_products) == 0:
+                    rendered_products = extract_heuristic_products(rendered.body, current_url, page_category)
+
+                if len(rendered_products) > 0:
+                    notes.append(
+                        current_url
+                        + ": found "
+                        + String(len(rendered_products))
+                        + " product(s) by rendering the page with a headless browser"
+                        + " (its raw HTML has no product markup on its own)."
+                    )
+                    products = rendered_products^
+                    pagination_source = rendered.body
+                else:
+                    notes.append(
+                        current_url
+                        + " found no product markup, even after rendering it with a"
+                        + " headless browser. It may need interaction (e.g. scrolling"
+                        + " or clicking) beyond basic rendering, or use a structure"
+                        + " this crawler's heuristics don't recognize."
+                    )
 
         for p in products:
             var abs_url = resolve_url(current_url, p.url)
@@ -92,7 +127,7 @@ def crawl(
                 product.image_url = resolve_url(current_url, product.image_url)
             pending_products.append(product^)
 
-        var next_url_opt = find_next_page_url(result.body, current_url)
+        var next_url_opt = find_next_page_url(pagination_source, current_url)
 
         if pages_crawled < capped_pages:
             rate_limit_sleep()
