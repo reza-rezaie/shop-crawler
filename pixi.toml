@@ -25,6 +25,7 @@ frontend-dev = { cmd = "npm run dev", cwd = "frontend" }
 [dependencies]
 # Native Mojo backend + crawler/business logic.
 mojo = ">=1.0.0,<2"
+playwright-python = ">=1.62.0,<2"
 # No third-party Python packages are required: the backend only uses Python's
 # standard library (sqlite3, urllib, http.server, json, html) via Mojo's
 # Python interop, for the specific pieces Mojo 1.0 GA does not yet cover
