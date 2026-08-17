@@ -1,0 +1,29 @@
+[workspace]
+authors = ["Reza Rezaie <mreza.rezaie@live.com>"]
+channels = ["https://conda.modular.com/max", "conda-forge", "https://repo.prefix.dev/modular-community"]
+name = "azure carwler 2"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+# Runs on every `pixi run` / `pixi shell` to make Mojo's Python interop work
+# reliably from this directory (see scripts/activate.sh for why).
+[activation]
+scripts = ["scripts/activate.sh"]
+
+[tasks]
+# Start the backend (Mojo business logic + a thin Python HTTP server).
+serve = "python backend/server.py"
+# One-shot crawl from the command line, without the web UI.
+crawl = "python backend/server.py --crawl-once"
+# Frontend dev/build helpers (Node/npm, used only for the React UI).
+frontend-install = { cmd = "npm install", cwd = "frontend" }
+frontend-build = { cmd = "npm run build", cwd = "frontend" }
+frontend-dev = { cmd = "npm run dev", cwd = "frontend" }
+
+[dependencies]
+# Native Mojo backend + crawler/business logic.
+mojo = ">=1.0.0,<2"
+# No third-party Python packages are required: the backend only uses Python's
+# standard library (sqlite3, urllib, http.server, json, html) via Mojo's
+# Python interop, for the specific pieces Mojo 1.0 GA does not yet cover
+# natively. See SPEC.md for the full breakdown.
