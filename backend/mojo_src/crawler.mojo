@@ -139,20 +139,20 @@ def crawl(
                 product.image_url = resolve_url(current_url, product.image_url)
             pending_products.append(product^)
 
-        if len(products) > 0:
-            var next_url_opt = find_next_page_url(pagination_source, current_url)
-            if next_url_opt:
-                var next_url = next_url_opt.value()
-                if next_url != current_url:
-                    queue.append(next_url)
-        elif looks_like_not_found_page(pagination_source):
+        if len(products) == 0 and looks_like_not_found_page(pagination_source):
             notes.append(
                 current_url
                 + " does not appear to be a real page on this site (its content looks"
                 + " like a \"not found\" / 404 page), so it was not crawled further."
             )
         else:
-            if attempted_rendering:
+            if len(products) > 0:
+                var next_url_opt = find_next_page_url(pagination_source, current_url)
+                if next_url_opt:
+                    var next_url = next_url_opt.value()
+                    if next_url != current_url:
+                        queue.append(next_url)
+            elif attempted_rendering:
                 notes.append(
                     current_url
                     + " found no product markup, even after rendering it with a"
@@ -160,11 +160,18 @@ def crawl(
                     + " or clicking) beyond basic rendering, or use a structure"
                     + " this crawler's heuristics don't recognize."
                 )
+
+            # Look for narrower category links regardless of whether this
+            # page also had products of its own -- a real category page
+            # commonly shows some products *and* links to subcategories on
+            # the same page (e.g. a department's top-level page), and a
+            # crawl aimed at that page should still reach everything
+            # beneath it, not just what's shown at this level.
             var children = find_child_links(pagination_source, current_url, MAX_CHILD_LINKS_PER_HUB_PAGE)
             if len(children) > 0:
                 notes.append(
                     current_url
-                    + " has no products of its own but links to "
+                    + " links to "
                     + String(len(children))
                     + " narrower category page(s); following them."
                 )

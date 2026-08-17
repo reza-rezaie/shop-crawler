@@ -60,14 +60,21 @@ backend/server.py --port 8010`).
    this pay no extra cost. Confirmed working end-to-end on a real
    AngularJS SPA (`https://www.azurestandard.com`); if it still finds
    nothing even after rendering, the crawl result says so.
-6. If a page has no products of its own but links to narrower category
-   pages (a "hub"/"browse" page on a site with a category tree — common
-   on larger stores), the crawl automatically follows a bounded number of
-   those links too, so pointing it at a high-level category can still
-   reach the real listings underneath it — all within the same "Max
-   pages" budget. If a crawled URL turns out not to be a real page on the
-   site at all (e.g. a typo'd or incomplete category URL), the crawl
-   result says that specifically, instead of a generic "found nothing."
+6. Every crawled page is also checked for links to narrower category
+   pages (a category tree — common on larger stores), and the crawl
+   automatically follows a bounded number of them — whether or not that
+   page also had products of its own (a department landing page often
+   has both). Pointing the crawl at a high-level category keeps drilling
+   deeper level by level until the same "Max pages" budget runs out, so a
+   **large** category (thousands of subcategories, in the worst case) will
+   only ever get a bounded sample within one crawl request, not
+   exhaustive coverage — raise "Max pages" for a bigger sample, or run
+   several separate crawls seeded at different subcategories (re-crawling
+   only updates existing products, it never duplicates). If a crawled URL
+   turns out not to be a real page on the site at all (e.g. a typo'd or
+   incomplete category URL — `/shop/category/food/` isn't real on
+   azurestandard.com, `/shop/category/food/21244` is), the crawl result
+   says that specifically, instead of a generic "found nothing."
 
 ### One-shot crawl without the UI
 

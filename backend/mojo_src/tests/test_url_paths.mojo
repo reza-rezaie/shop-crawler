@@ -66,6 +66,20 @@ def test_is_child_path() raises:
         "the path-stem rule works the same for any hub page, not just this one example",
     )
 
+    # Regression: the site root's path-stem is "/" itself, which is a
+    # prefix of every path on the site -- without an explicit guard,
+    # crawling a homepage would misread every link on it (found live:
+    # books.toscrape.com's product/category links) as a "child" page.
+    var root = String("https://books.toscrape.com/")
+    check(
+        not is_child_path("https://books.toscrape.com/catalogue/some-book_123/index.html", root),
+        "no link is treated as a child of the site root",
+    )
+    check(
+        not is_child_path("https://books.toscrape.com/catalogue/category/books/mystery_3/index.html", root),
+        "not even a real category page is treated as a child of the site root",
+    )
+
 
 def test_find_all_anchor_hrefs() raises:
     var html = String('<a href="/a">A</a><a class="x" href="https://other.com/b">B</a><a>no href</a>')

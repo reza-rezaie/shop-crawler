@@ -77,7 +77,13 @@ def is_child_path(candidate_url: String, current_url: String) -> Bool:
     hierarchical category-tree URL scheme: same host, and its path is
     nested under the current page's own path stem. Generic URL-structure
     heuristic -- no assumption about markup, class names, or any one
-    site's query-parameter conventions."""
+    site's query-parameter conventions.
+
+    The site root (`/`) is deliberately never treated as having children
+    by this rule: stripping its one and only path segment still yields
+    `/`, which is a prefix of every path on the site -- without this
+    guard, crawling a site's homepage would misread every link on the
+    page (articles, individual products, anything) as a "child" page."""
     if extract_host(candidate_url) != extract_host(current_url):
         return False
     var current_path = url_path(current_url)
@@ -85,10 +91,9 @@ def is_child_path(candidate_url: String, current_url: String) -> Bool:
     if candidate_path == current_path:
         return False
     var stem = url_path_stem(current_url)
-    var prefix = stem + "/"
     if stem == "/":
-        prefix = String("/")
-    return candidate_path.startswith(prefix)
+        return False
+    return candidate_path.startswith(stem + "/")
 
 
 def find_all_anchor_hrefs(html: String) -> List[String]:
