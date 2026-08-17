@@ -258,6 +258,14 @@ def _product_from_block(block: String, listing_url: String, page_category: Strin
         var src = extract_attr(img_tag.value(), "src")
         if src:
             image_url = src.value()
+        else:
+            # Common Angular pattern for lazy/deferred image sources: no
+            # plain `src` at all, only `ng-src` (set once the framework
+            # resolves the expression -- by the time we see the HTML,
+            # already a real, resolved URL).
+            var ng_src = extract_attr(img_tag.value(), "ng-src")
+            if ng_src:
+                image_url = ng_src.value()
 
     if name.byte_length() == 0:
         name = img_alt
@@ -292,6 +300,11 @@ def _find_price_text(block: String) raises -> String:
     var span_block = extract_blocks_by_class_hint(block, "span", String("price"))
     if len(span_block) >= 1:
         return clean_text(span_block[0])
+    # Some sites (e.g. Angular apps) wrap the price in a <div> instead of a
+    # <p>/<span>.
+    var div_block = extract_blocks_by_class_hint(block, "div", String("price"))
+    if len(div_block) >= 1:
+        return clean_text(div_block[0])
 
     var currency_symbols = List[String]()
     currency_symbols.append(String("£"))

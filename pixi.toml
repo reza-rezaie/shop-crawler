@@ -17,6 +17,10 @@ serve = "python backend/server.py"
 crawl = "python backend/server.py --crawl-once"
 # Native-Mojo test suite (see backend/mojo_src/tests/).
 test = "bash scripts/run_tests.sh"
+# One-time setup: downloads the Chromium binary Playwright needs for the
+# JS-rendering crawl fallback (browser_client.mojo). Not a Conda package,
+# so it isn't pulled in by `pixi install` -- run this once per environment.
+playwright-install = "playwright install chromium"
 # Frontend dev/build helpers (Node/npm, used only for the React UI).
 frontend-install = { cmd = "npm install", cwd = "frontend" }
 frontend-build = { cmd = "npm run build", cwd = "frontend" }
@@ -25,8 +29,11 @@ frontend-dev = { cmd = "npm run dev", cwd = "frontend" }
 [dependencies]
 # Native Mojo backend + crawler/business logic.
 mojo = ">=1.0.0,<2"
+# The one third-party Python dependency: a JS-rendering fallback for pages
+# whose product listing only exists client-side (see browser_client.mojo).
+# Note the package name -- on conda-forge, plain "playwright" is the
+# Node.js CLI/library, not the Python bindings.
 playwright-python = ">=1.62.0,<2"
-# No third-party Python packages are required: the backend only uses Python's
-# standard library (sqlite3, urllib, http.server, json, html) via Mojo's
-# Python interop, for the specific pieces Mojo 1.0 GA does not yet cover
-# natively. See SPEC.md for the full breakdown.
+# Everything else the backend uses via Mojo's Python interop is Python's
+# standard library (sqlite3, urllib, http.server, json, html) -- see
+# SPEC.md for the full breakdown of what's native Mojo vs. Python interop.
