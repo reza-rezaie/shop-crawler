@@ -105,9 +105,26 @@
   color: var(--success);
 }
 
+.crawl-status.warning {
+  background: rgba(240, 185, 92, 0.12);
+  color: var(--warning);
+}
+
 .crawl-status.error {
   background: rgba(255, 128, 128, 0.12);
   color: var(--danger);
+}
+
+.crawl-notes {
+  margin: 0.6rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--warning);
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+
+.crawl-notes li + li {
+  margin-top: 0.35rem;
 }
 
 .filters {
@@ -189,6 +206,17 @@
   flex-direction: column;
   gap: 0.3rem;
   flex: 1;
+}
+
+.product-source {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .product-name {

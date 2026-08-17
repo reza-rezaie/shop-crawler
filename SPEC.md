@@ -93,9 +93,10 @@ All under `http://localhost:8000`, served by `backend/server.py`:
 | Method | Path                | Description |
 |--------|----------------------|-------------|
 | GET    | `/api/health`        | `{status, product_count}` — liveness + row count |
-| POST   | `/api/crawl`         | Body: `{"url": "...", "max_pages": 3, "fetch_descriptions": true}`. Runs a crawl synchronously and upserts results. Returns a summary: pages crawled, products created/updated, errors. |
-| GET    | `/api/products`      | Query params: `search`, `category`, `min_price`, `max_price`, `page`, `page_size`. Returns `{items, total, page, page_size}`. |
+| POST   | `/api/crawl`         | Body: `{"url": "...", "max_pages": 3, "fetch_descriptions": true}`. Runs a crawl synchronously and upserts results. Returns a summary: pages crawled, products created/updated, errors, and `notes` (e.g. a page that looks client-rendered and yielded no products — see `openspec/changes/fix-product-extraction-and-browsing/`). |
+| GET    | `/api/products`      | Query params: `search`, `category`, `source_host`, `min_price`, `max_price`, `page`, `page_size`. Returns `{items, total, page, page_size}`; each item includes `source_host` (the site it was crawled from, derived from `source_listing_url`). |
 | GET    | `/api/categories`    | Distinct non-null categories currently in the DB, for the filter dropdown. |
+| GET    | `/api/sources`       | Distinct source-site hosts currently in the DB, for the site filter dropdown. |
 | GET    | `/` and static paths | Serves the built React app from `frontend/dist`. |
 
 The crawl endpoint is intentionally synchronous (simple architecture for a

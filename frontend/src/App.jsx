@@ -41,6 +41,11 @@ function ProductCard({ product }) {
         )}
       </div>
       <div className="product-body">
+        {product.source_host && (
+          <div className="product-source" title="Crawled from this site">
+            {product.source_host}
+          </div>
+        )}
         <div className="product-name">{product.name}</div>
         {product.category && (
           <div className="product-category">{product.category}</div>
@@ -59,14 +64,17 @@ export default function App() {
   const [fetchDescriptions, setFetchDescriptions] = useState(true)
   const [crawling, setCrawling] = useState(false)
   const [crawlStatus, setCrawlStatus] = useState(null) // {type, message}
+  const [crawlNotes, setCrawlNotes] = useState([])
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
+  const [sourceHost, setSourceHost] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [page, setPage] = useState(1)
 
   const [categories, setCategories] = useState([])
+  const [sources, setSources] = useState([])
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -81,6 +89,15 @@ export default function App() {
     }
   }, [])
 
+  const loadSources = useCallback(async () => {
+    try {
+      const srcs = await apiGet('/api/sources')
+      setSources(srcs)
+    } catch {
+      // Non-fatal: filter dropdown just stays empty.
+    }
+  }, [])
+
   const loadProducts = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
@@ -88,6 +105,7 @@ export default function App() {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
       if (category) params.set('category', category)
+      if (sourceHost) params.set('source_host', sourceHost)
       if (minPrice) params.set('min_price', minPrice)
       if (maxPrice) params.set('max_price', maxPrice)
       params.set('page', String(page))
@@ -100,11 +118,12 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [search, category, minPrice, maxPrice, page])
+  }, [search, category, sourceHost, minPrice, maxPrice, page])
 
   useEffect(() => {
     loadCategories()
-  }, [loadCategories])
+    loadSources()
+  }, [loadCategories, loadSources])
 
   useEffect(() => {
     loadProducts()
@@ -113,13 +132,14 @@ export default function App() {
   // Reset to page 1 whenever a filter changes.
   useEffect(() => {
     setPage(1)
-  }, [search, category, minPrice, maxPrice])
+  }, [search, category, sourceHost, minPrice, maxPrice])
 
   const handleCrawl = async (e) => {
     e.preventDefault()
     if (!crawlUrl.trim()) return
     setCrawling(true)
     setCrawlStatus({ type: 'info', message: 'Crawling... this can take a while depending on page/product count.' })
+    setCrawlNotes([])
     try {
       const result = await apiPost('/api/crawl', {
         url: crawlUrl.trim(),
@@ -133,10 +153,12 @@ export default function App() {
           ? ` (${result.errors.length} warning${result.errors.length > 1 ? 's' : ''})`
           : ''
         setCrawlStatus({
-          type: 'success',
+          type: result.products_found === 0 ? 'warning' : 'success',
           message: `Crawled ${result.pages_crawled} page(s): ${result.products_created} new, ${result.products_updated} updated (${result.products_found} total found)${errSuffix}.`,
         })
+        setCrawlNotes(result.notes || [])
         await loadCategories()
+        await loadSources()
         await loadProducts()
       }
     } catch (err) {
@@ -197,6 +219,13 @@ export default function App() {
         {crawlStatus && (
           <div className={`crawl-status ${crawlStatus.type}`}>{crawlStatus.message}</div>
         )}
+        {crawlNotes.length > 0 && (
+          <ul className="crawl-notes">
+            {crawlNotes.map((note, i) => (
+              <li key={i}>{note}</li>
+            ))}
+          </ul>
+        )}
       </form>
 
       <div className="filters">
@@ -211,6 +240,18 @@ export default function App() {
           {categories.map((c) => (
             <option key={c} value={c}>
               {c}
+            </option>
+          ))}
+        </select>
+        <select
+          value={sourceHost}
+          onChange={(e) => setSourceHost(e.target.value)}
+          title="Filter by which site a product was crawled from"
+        >
+          <option value="">All sites</option>
+          {sources.map((s) => (
+            <option key={s} value={s}>
+              {s}
             </option>
           ))}
         </select>

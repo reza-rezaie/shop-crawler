@@ -29,7 +29,7 @@
 - [x] 2.3 Include collected per-page notes in the crawl summary returned by
       `crawler.crawl` / `api.crawl` (additive field, no breaking change to
       existing summary fields).
-- [ ] 2.4 Update `frontend/src/App.jsx` to display any crawl notes/warnings
+- [x] 2.4 Update `frontend/src/App.jsx` to display any crawl notes/warnings
       returned alongside the existing success/error status.
 
 ## 3. Source attribution (storage + API)
@@ -48,11 +48,11 @@
 
 ## 4. Frontend: browse-all view with source attribution
 
-- [ ] 4.1 In `App.jsx`, display each product's source site on its card.
-- [ ] 4.2 In `App.jsx`, add a source-site filter control populated from
+- [x] 4.1 In `App.jsx`, display each product's source site on its card.
+- [x] 4.2 In `App.jsx`, add a source-site filter control populated from
       `/api/sources`, combinable with the existing search/category/price
       filters.
-- [ ] 4.3 Update `App.css` for the new card element and filter control.
+- [x] 4.3 Update `App.css` for the new card element and filter control.
 
 ## 5. Tests
 
@@ -64,16 +64,16 @@
 - [x] 5.2 Add a small script/test exercising `db.query_products`'s new
       `source_host` filter and `list_sources` against a temp SQLite DB with
       multi-site fixture data.
-- [ ] 5.3 Run the full `pixi run mojo run` / API smoke test suite and
+- [x] 5.3 Run the full `pixi run mojo run` / API smoke test suite and
       record results in the PR/commit description.
 
 ## 6. Verification
 
-- [ ] 6.1 Re-crawl `https://www.azurestandard.com/shop/category/` and
+- [x] 6.1 Re-crawl `https://www.azurestandard.com/shop/category/` and
       confirm the crawl summary reports zero products with the SPA note,
       and no bogus product is created.
-- [ ] 6.2 Re-crawl `https://books.toscrape.com/` (existing verified target)
+- [x] 6.2 Re-crawl `https://books.toscrape.com/` (existing verified target)
       and confirm extraction results are unchanged (no regression).
-- [ ] 6.3 Verify in the running UI that products from both crawls (if any
+- [x] 6.3 Verify in the running UI that products from both crawls (if any
       stored data exists from earlier sessions) are visibly attributed to
       their source site and the source filter works end-to-end.
