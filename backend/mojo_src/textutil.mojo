@@ -83,31 +83,85 @@ def find_matching_close(html: String, body_start: Int, tag: String) -> Int:
 
 def extract_attr(tag_text: String, attr_name: String) -> Optional[String]:
     """Extract `attr_name="..."` or `attr_name='...'` from a single opening
-    tag's text (e.g. `<a href="foo" class="bar">`)."""
-    var dq_marker = attr_name + '="'
-    var idx = tag_text.find(dq_marker)
-    if idx != -1:
-        var start = idx + dq_marker.byte_length()
-        var end = tag_text.find('"', start)
-        if end == -1:
-            return None
-        return String(tag_text[byte = start : end])
+    tag's text (e.g. `<a href="foo" class="bar">`). Requires a proper
+    boundary immediately before `attr_name`, so looking up `class` can never
+    return the value of a differently-named attribute that merely ends with
+    the same characters (e.g. `ng-class`)."""
+    var dq_result = _find_attr_value(tag_text, attr_name + '="', '"')
+    if dq_result:
+        return dq_result
 
-    var sq_marker = attr_name + "='"
-    idx = tag_text.find(sq_marker)
-    if idx != -1:
-        var start = idx + sq_marker.byte_length()
-        var end = tag_text.find("'", start)
-        if end == -1:
-            return None
-        return String(tag_text[byte = start : end])
+    var sq_result = _find_attr_value(tag_text, attr_name + "='", "'")
+    if sq_result:
+        return sq_result
 
     return None
 
 
+def _find_attr_value(tag_text: String, marker: String, quote: String) -> Optional[String]:
+    var pos = 0
+    while True:
+        var idx = tag_text.find(marker, pos)
+        if idx == -1:
+            return None
+
+        var boundary_ok = True
+        if idx > 0:
+            var before = String(tag_text[byte = idx - 1 : idx])
+            if not (
+                before == " "
+                or before == "\t"
+                or before == "\n"
+                or before == "\r"
+                or before == '"'
+                or before == "'"
+            ):
+                boundary_ok = False
+
+        if boundary_ok:
+            var start = idx + marker.byte_length()
+            var end = tag_text.find(quote, start)
+            if end == -1:
+                return None
+            return String(tag_text[byte = start : end])
+
+        pos = idx + 1
+
+
+def is_valid_class_token(token: String) -> Bool:
+    """Whether `token` could be a real CSS class name: letters, digits,
+    `-`, or `_` only. Used to reject JS-framework binding expressions
+    (`{ 'x': product.y }`, `product.favoriteProcessing`, ...) that contain
+    a hint word as plain text but aren't actual class names."""
+    if token.byte_length() == 0:
+        return False
+    for ch in token:
+        var c = String(ch)
+        var is_ascii_alnum = (c >= "0" and c <= "9") or (c >= "a" and c <= "z") or (c >= "A" and c <= "Z")
+        if not (is_ascii_alnum or c == "-" or c == "_"):
+            return False
+    return True
+
+
+def class_hint_matches(class_value: String, hint: String) -> Bool:
+    """Whether `hint` appears inside one of `class_value`'s individual,
+    whitespace-separated class tokens -- not merely anywhere in the raw
+    attribute text. This is what keeps a `class="{ 'x':
+    product.favoriteProcessing }"` binding expression from being mistaken
+    for a real `product`-ish class."""
+    var normalized = collapse_whitespace(class_value)
+    var tokens = normalized.split(" ")
+    for token in tokens:
+        var t = String(token)
+        if is_valid_class_token(t) and contains_ci(t, hint):
+            return True
+    return False
+
+
 def extract_blocks_by_class_hint(html: String, tag: String, class_hint: String) -> List[String]:
     """Find all `<tag ...class="...hint...">...</tag>` elements (case
-    insensitive hint match), returned as their full outer HTML."""
+    insensitive hint match against a whole class token), returned as their
+    full outer HTML."""
     var results = List[String]()
     var pos = 0
     while True:
@@ -121,7 +175,7 @@ def extract_blocks_by_class_hint(html: String, tag: String, class_hint: String) 
         var class_val = extract_attr(open_tag_text, "class")
         var is_match = False
         if class_val:
-            if contains_ci(class_val.value(), class_hint):
+            if class_hint_matches(class_val.value(), class_hint):
                 is_match = True
         if is_match:
             var close_end = find_matching_close(html, open_end + 1, tag)

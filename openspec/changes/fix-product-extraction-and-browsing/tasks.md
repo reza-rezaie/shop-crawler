@@ -1,14 +1,14 @@
 ## 1. Extraction correctness fixes (native Mojo)
 
-- [ ] 1.1 In `textutil.mojo`, change the class-hint matching used by
+- [x] 1.1 In `textutil.mojo`, change the class-hint matching used by
       `extract_blocks_by_class_hint` to split the `class` attribute value on
       whitespace and match the hint against individual tokens, accepting
       only tokens made of `[A-Za-z0-9_-]` characters.
-- [ ] 1.2 In `textutil.mojo`, harden `extract_attr` so a match on
+- [x] 1.2 In `textutil.mojo`, harden `extract_attr` so a match on
       `<name>="` requires the preceding character to be a word boundary
       (start of tag, whitespace, or quote), so `class` can't match inside
       `ng-class`.
-- [ ] 1.3 Add/update unit-style test coverage (see section 5) proving the
+- [x] 1.3 Add/update unit-style test coverage (see section 5) proving the
       Angular `class="{ ... product.something }"` case no longer matches
       and a real `product_pod`/`product-item` class still does.
 

@@ -1,0 +1,19 @@
+<!DOCTYPE html><html class="no-js" lang="en-US" ng-app="app" prefix="og: http://ogp.me/ns#">
+<head><meta charset="utf-8"><title>Shop</title></head>
+<body class="flex flex-col min-h-screen group/body" id="js-body" ng-class="[pageName,{'is-slideoutCartOpen': $root.showSlideoutCart}]">
+  <!--
+    Real snippet pattern from https://www.azurestandard.com/shop/category/ :
+    an AngularJS app shell with no product markup at all in the raw HTML.
+    The only elements whose `class` attribute contains the substring
+    "product" are client-side binding expressions, not real product cards
+    -- this is what used to trick the heuristic extractor.
+  -->
+  <div class="{ 'Animate--heartPulse': product.favoriteProcessing, 'Animate--heartFavoritePop': (isAnyPackFavorited()) && (product.favoritePopActive) }">
+    <a href="/wishlist"><img src="/icons/heart.svg" alt="Favorite"></a>
+  </div>
+  <li class="NavSlideout-li NavSlideout-li--hasChildren" ng-class="{'is-childActive': $state.params.slug === 'azure-product-standards'}">
+    <a href="/about/azure-product-standards">Our Standards</a>
+  </li>
+  <div id="root"></div>
+</body>
+</html>
