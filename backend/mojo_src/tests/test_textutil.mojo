@@ -14,6 +14,7 @@ from textutil import (
     is_valid_class_token,
     extract_attr,
     extract_blocks_by_class_hint,
+    find_all_anchor_hrefs_with_text,
 )
 
 
@@ -94,10 +95,26 @@ def test_books_toscrape_fixture_still_matches() raises:
     check(len(matches) == 2, "both product_pod articles in the fixture still match")
 
 
+def test_find_all_anchor_hrefs_with_text() raises:
+    var html = String(
+        '<a href="/shop/category/food/flour/22474">Flour</a>'
+        + '<a href="/shop/category/food/sweeteners/26411"><img src="x.png" alt="Sweeteners"/></a>'
+        + '<a href="/about/history">  About   Us  </a>'
+    )
+    var links = find_all_anchor_hrefs_with_text(html)
+    check(len(links) == 3, "all three anchors are found")
+    check(links[0].href == "/shop/category/food/flour/22474", "first href is captured")
+    check(links[0].text == "Flour", "first anchor's text is captured")
+    check(links[1].href == "/shop/category/food/sweeteners/26411", "second href is captured")
+    check(links[1].text == "", "an anchor with no visible text (image-only) has empty text, not a crash")
+    check(links[2].text == "About Us", "surrounding/internal whitespace in anchor text is collapsed")
+
+
 def main() raises:
     test_class_hint_matches()
     test_is_valid_class_token()
     test_extract_attr_boundary()
     test_azurestandard_fixture_no_false_positive()
     test_books_toscrape_fixture_still_matches()
+    test_find_all_anchor_hrefs_with_text()
     print("All textutil tests passed.")

@@ -13,6 +13,10 @@ scripts = ["scripts/activate.sh"]
 [tasks]
 # Start the backend (Mojo business logic + a thin Python HTTP server).
 serve = "python backend/server.py"
+# Convenience launcher: fixed, unusual port (avoids clashing with other
+# local dev servers), builds the frontend first if needed, prints the URL
+# to open. Override the port with e.g. `PORT=8935 pixi run dev`.
+dev = "bash scripts/dev_server.sh"
 # One-shot crawl from the command line, without the web UI.
 crawl = "python backend/server.py --crawl-once"
 # Native-Mojo test suite (see backend/mojo_src/tests/).
