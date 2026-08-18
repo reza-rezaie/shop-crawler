@@ -1,9 +1,18 @@
-# Native Mojo crawl orchestration: fetch -> extract -> paginate -> (optionally)
-# fetch descriptions -> upsert. This is the one place that ties together
-# http_client.mojo, html_extract.mojo, pricing.mojo (via html_extract) and
-# db.mojo. The only Python interop used directly here is building the
-# summary as a Python dict (so api.mojo can hand it straight back to the
-# HTTP layer).
+# Native Mojo crawl orchestration: fetch -> extract -> discover more pages
+# -> (optionally) fetch descriptions -> upsert. This is the one place that
+# ties together http_client.mojo, html_extract.mojo, pricing.mojo (via
+# html_extract), browser_client.mojo, and db.mojo. The only Python interop
+# used directly here is building the summary as a Python dict (so api.mojo
+# can hand it straight back to the HTTP layer).
+#
+# "More pages" comes from two sources, treated uniformly as one work queue:
+# same-listing pagination (a page that had products, following its
+# `<link rel="next">`-style link), and category "drill-down" (a page that
+# had *no* products of its own, following same-host links nested under its
+# own URL path -- see html_extract.find_child_links). Both count against
+# the same overall `max_pages` budget. See openspec/changes/archive/
+# ...-add-category-drill-down-crawling/ for why this replaced a simpler
+# linear pagination-only walk.
 
 from std.python import Python, PythonObject
 from models import Product
@@ -17,12 +26,15 @@ from html_extract import (
     extract_last_breadcrumb_items,
     extract_product_description,
     looks_like_client_rendered_app,
+    looks_like_not_found_page,
+    find_child_links,
 )
 from db import upsert_product
 
 comptime MAX_PAGES_DEFAULT = 3
 comptime MAX_PAGES_HARD_CAP = 20
 comptime MAX_DETAIL_FETCHES_DEFAULT = 60
+comptime MAX_CHILD_LINKS_PER_HUB_PAGE = 8
 
 
 def crawl(
@@ -53,19 +65,24 @@ def crawl(
     var visited_pages = Dict[String, Bool]()
     var pending_products = List[Product]()
 
-    var current_url = seed_url
+    var queue = List[String]()
+    queue.append(seed_url)
+    var queue_pos = 0
     var pages_crawled = 0
 
-    while pages_crawled < capped_pages:
+    while queue_pos < len(queue) and pages_crawled < capped_pages:
+        var current_url = queue[queue_pos]
+        queue_pos += 1
+
         if current_url in visited_pages:
-            break
+            continue
         visited_pages[current_url] = True
 
         var result = fetch(current_url)
         pages_crawled += 1
         if not result.ok:
             errors.append("Failed to fetch " + current_url + ": " + result.error)
-            break
+            continue
 
         var page_category = extract_breadcrumb_category(result.body)
 
@@ -73,13 +90,15 @@ def crawl(
         if len(products) == 0:
             products = extract_heuristic_products(result.body, current_url, page_category)
 
-        # Pagination is normally discovered from the raw HTML; if the JS
-        # rendering fallback below finds real content, its rendered HTML
-        # (which contains everything the raw HTML had, plus what JS added)
-        # replaces it so pagination links added client-side aren't missed.
+        # Pagination and child-link discovery are normally done from the
+        # raw HTML; if the JS-rendering fallback below runs, its rendered
+        # HTML (a strict superset of the raw HTML's content, plus whatever
+        # JS added) replaces it for both.
         var pagination_source = result.body
+        var attempted_rendering = False
 
         if looks_like_client_rendered_app(result.body, len(products)):
+            attempted_rendering = True
             var rendered = render_fetch(current_url)
             if not rendered.ok:
                 notes.append(
@@ -89,6 +108,8 @@ def crawl(
                     + rendered.error
                 )
             else:
+                pagination_source = rendered.body
+
                 var rendered_category = extract_breadcrumb_category(rendered.body)
                 if rendered_category.byte_length() > 0:
                     page_category = rendered_category
@@ -106,15 +127,6 @@ def crawl(
                         + " (its raw HTML has no product markup on its own)."
                     )
                     products = rendered_products^
-                    pagination_source = rendered.body
-                else:
-                    notes.append(
-                        current_url
-                        + " found no product markup, even after rendering it with a"
-                        + " headless browser. It may need interaction (e.g. scrolling"
-                        + " or clicking) beyond basic rendering, or use a structure"
-                        + " this crawler's heuristics don't recognize."
-                    )
 
         for p in products:
             var abs_url = resolve_url(current_url, p.url)
@@ -127,18 +139,47 @@ def crawl(
                 product.image_url = resolve_url(current_url, product.image_url)
             pending_products.append(product^)
 
-        var next_url_opt = find_next_page_url(pagination_source, current_url)
+        if len(products) == 0 and looks_like_not_found_page(pagination_source):
+            notes.append(
+                current_url
+                + " does not appear to be a real page on this site (its content looks"
+                + " like a \"not found\" / 404 page), so it was not crawled further."
+            )
+        else:
+            if len(products) > 0:
+                var next_url_opt = find_next_page_url(pagination_source, current_url)
+                if next_url_opt:
+                    var next_url = next_url_opt.value()
+                    if next_url != current_url:
+                        queue.append(next_url)
+            elif attempted_rendering:
+                notes.append(
+                    current_url
+                    + " found no product markup, even after rendering it with a"
+                    + " headless browser. It may need interaction (e.g. scrolling"
+                    + " or clicking) beyond basic rendering, or use a structure"
+                    + " this crawler's heuristics don't recognize."
+                )
+
+            # Look for narrower category links regardless of whether this
+            # page also had products of its own -- a real category page
+            # commonly shows some products *and* links to subcategories on
+            # the same page (e.g. a department's top-level page), and a
+            # crawl aimed at that page should still reach everything
+            # beneath it, not just what's shown at this level.
+            var children = find_child_links(pagination_source, current_url, MAX_CHILD_LINKS_PER_HUB_PAGE)
+            if len(children) > 0:
+                notes.append(
+                    current_url
+                    + " links to "
+                    + String(len(children))
+                    + " narrower category page(s); following them."
+                )
+                for child_url in children:
+                    queue.append(child_url)
 
         if pages_crawled < capped_pages:
             rate_limit_sleep()
-
-        if next_url_opt:
-            var next_url = next_url_opt.value()
-            if next_url == current_url:
-                break
-            current_url = next_url
-        else:
-            break
 
     var created = 0
     var updated = 0

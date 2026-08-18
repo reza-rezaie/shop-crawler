@@ -17,6 +17,7 @@
 from std.python import Python, PythonObject
 from models import Product
 from pricing import parse_price
+from http_client import resolve_url
 from textutil import (
     extract_attr,
     extract_blocks_by_class_hint,
@@ -25,6 +26,9 @@ from textutil import (
     find_tag_open,
     clean_text,
     contains_ci,
+    inner_text_of_first,
+    find_all_anchor_hrefs,
+    is_child_path,
 )
 
 def _candidate_tags() -> List[String]:
@@ -444,6 +448,49 @@ def looks_like_client_rendered_app(html: String, product_count: Int) -> Bool:
         if marker in html:
             return True
     return False
+
+
+def looks_like_not_found_page(html: String) raises -> Bool:
+    """Whether the page's own content is a "not found"/404 page -- as
+    opposed to a real page that legitimately has no products (e.g. an
+    empty category). Checked via the page's first heading (h1, then h2)
+    mentioning "not found" or "404" and being short (an error page's
+    heading is a phrase, not a long product/category title that happens
+    to contain those words). A heuristic, not a guarantee: only ever
+    consulted after extraction already found zero products, and only
+    ever adds a note -- it never suppresses real results (see
+    openspec/changes/archive/...-add-category-drill-down-crawling/)."""
+    var heading_tags = List[String]()
+    heading_tags.append(String("h1"))
+    heading_tags.append(String("h2"))
+    for tag in heading_tags:
+        var inner = inner_text_of_first(html, tag)
+        if inner:
+            var text = clean_text(inner.value())
+            if text.byte_length() > 0 and text.byte_length() <= 40:
+                if contains_ci(text, "not found") or contains_ci(text, "404"):
+                    return True
+    return False
+
+
+def find_child_links(html: String, current_url: String, limit: Int) raises -> List[String]:
+    """Same-host links on `html` whose URL path is nested under
+    `current_url`'s own path (see textutil.is_child_path) -- candidate
+    "drill down" pages for a category hub that lists no products of its
+    own. Deduplicated, capped at `limit`."""
+    var results = List[String]()
+    var seen = Dict[String, Bool]()
+    var hrefs = find_all_anchor_hrefs(html)
+    for href in hrefs:
+        if len(results) >= limit:
+            break
+        var resolved = resolve_url(current_url, href)
+        if resolved in seen:
+            continue
+        seen[resolved] = True
+        if is_child_path(resolved, current_url):
+            results.append(resolved)
+    return results^
 
 
 def extract_product_description(html: String) raises -> String:
