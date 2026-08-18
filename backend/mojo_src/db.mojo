@@ -24,6 +24,19 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);
+
+CREATE TABLE IF NOT EXISTS site_categories (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    url               TEXT NOT NULL UNIQUE,
+    name              TEXT NOT NULL,
+    parent_url        TEXT,
+    host              TEXT NOT NULL,
+    has_own_products  INTEGER,
+    first_seen_at     TEXT NOT NULL,
+    last_seen_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_site_categories_host ON site_categories(host);
+CREATE INDEX IF NOT EXISTS idx_site_categories_parent ON site_categories(parent_url);
 """
 
 
@@ -46,6 +59,16 @@ def _none_or_str(value: String) raises -> PythonObject:
     if value.byte_length() == 0:
         return Python.none()
     return PythonObject(value)
+
+
+def _none_or_bool_as_int(value: Optional[Bool]) raises -> PythonObject:
+    """NULL for unknown, else 0/1 -- how has_own_products' tri-state is
+    represented in SQLite (no native boolean/nullable-bool type)."""
+    if value:
+        if value.value():
+            return PythonObject(1)
+        return PythonObject(0)
+    return Python.none()
 
 
 struct UpsertOutcome(Copyable, Movable):
@@ -116,6 +139,89 @@ def upsert_product(conn: PythonObject, product: Product) raises -> UpsertOutcome
     )
     conn.commit()
     return UpsertOutcome(False)
+
+
+def upsert_site_category(
+    conn: PythonObject,
+    url: String,
+    name: String,
+    parent_url: String,
+    host: String,
+    has_own_products: Optional[Bool],
+) raises -> UpsertOutcome:
+    """Insert a new discovered category node, or update an existing one
+    (matched by url) -- same idempotent-upsert shape as upsert_product, so
+    re-running discovery against a site already in the table is additive
+    rather than duplicative.
+
+    `has_own_products` is COALESCEd on update, never overwritten with
+    unknown (None): a node recorded as a bare link from its parent's page
+    (unknown, because its own page hasn't been fetched yet) must not wipe
+    out a true/false signal an earlier discovery run already established
+    for that same URL."""
+    var existing = conn.execute(
+        "SELECT id FROM site_categories WHERE url = ?",
+        Python.tuple(url),
+    ).fetchone()
+
+    var now = now_iso()
+
+    if existing is None:
+        conn.execute(
+            """INSERT INTO site_categories
+                (url, name, parent_url, host, has_own_products, first_seen_at, last_seen_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            Python.tuple(
+                url,
+                name,
+                _none_or_str(parent_url),
+                host,
+                _none_or_bool_as_int(has_own_products),
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+        return UpsertOutcome(True)
+
+    conn.execute(
+        """UPDATE site_categories SET
+            name = ?,
+            parent_url = ?,
+            host = ?,
+            has_own_products = COALESCE(?, has_own_products),
+            last_seen_at = ?
+           WHERE url = ?""",
+        Python.tuple(
+            name,
+            _none_or_str(parent_url),
+            host,
+            _none_or_bool_as_int(has_own_products),
+            now,
+            url,
+        ),
+    )
+    conn.commit()
+    return UpsertOutcome(False)
+
+
+def list_site_categories(conn: PythonObject, host: String) raises -> PythonObject:
+    """Every category node discovered for one host, in discovery order --
+    the tree view groups these by parent_url client-side."""
+    var rows = conn.execute(
+        "SELECT id, url, name, parent_url, has_own_products FROM site_categories WHERE host = ? ORDER BY id ASC",
+        Python.tuple(host),
+    ).fetchall()
+    var out = Python.list()
+    for row in rows:
+        var item = Python.dict()
+        item["id"] = row["id"]
+        item["url"] = row["url"]
+        item["name"] = row["name"]
+        item["parent_url"] = row["parent_url"]
+        item["has_own_products"] = row["has_own_products"]
+        out.append(item)
+    return out
 
 
 def count_products(conn: PythonObject) raises -> Int:

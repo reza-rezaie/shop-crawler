@@ -119,6 +119,50 @@ def find_all_anchor_hrefs(html: String) -> List[String]:
     return out^
 
 
+struct AnchorLink(Copyable, Movable):
+    """One `<a href="...">...</a>` occurrence: its raw href and cleaned
+    inner text. Used by category discovery to name a candidate category
+    page from its link text -- see find_all_anchor_hrefs_with_text."""
+    var href: String
+    var text: String
+
+    def __init__(out self, href: String, text: String):
+        self.href = href
+        self.text = text
+
+
+def find_all_anchor_hrefs_with_text(html: String) raises -> List[AnchorLink]:
+    """Like find_all_anchor_hrefs, but also captures each anchor's cleaned
+    inner text (e.g. `<a href="/x">Flour</a>` -> href "/x", text "Flour").
+    Additive alongside find_all_anchor_hrefs rather than changing its
+    return type -- find_child_links (product-extraction's drill-down)
+    only ever needed the href and stays on the plain version."""
+    var out = List[AnchorLink]()
+    var pos = 0
+    while True:
+        var open_idx = find_tag_open(html, "a", pos)
+        if open_idx == -1:
+            break
+        var open_end = html.find(">", open_idx)
+        if open_end == -1:
+            break
+        var tag_text = String(html[byte = open_idx : open_end + 1])
+        var href = extract_attr(tag_text, "href")
+
+        var close_marker = "</a>"
+        var close_idx = html.find(close_marker, open_end + 1)
+        var text = String("")
+        var next_pos = open_end + 1
+        if close_idx != -1:
+            text = clean_text(String(html[byte = open_end + 1 : close_idx]))
+            next_pos = close_idx + close_marker.byte_length()
+
+        if href:
+            out.append(AnchorLink(href.value(), text))
+        pos = next_pos
+    return out^
+
+
 def to_lower_ascii(s: String) -> String:
     """ASCII-only lowercasing, used for case-insensitive keyword checks on
     short attribute values (class names etc.). Iterates by grapheme (Mojo's

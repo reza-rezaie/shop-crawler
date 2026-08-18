@@ -7,7 +7,14 @@
 
 from std.python import Python
 from testing import check
-from db import connect, upsert_product, query_products, list_sources
+from db import (
+    connect,
+    upsert_product,
+    query_products,
+    list_sources,
+    upsert_site_category,
+    list_site_categories,
+)
 from models import Product
 
 
@@ -87,6 +94,62 @@ def main() raises:
     )
     var after_recrawl = query_products(conn, String(""), String(""), None, None, String(""), 1, 20)
     check(Int(String(after_recrawl["total"])) == 3, "re-upserting an existing product_url does not create a duplicate")
+
+    # site_categories: insert, upsert-by-url, has_own_products tri-state,
+    # and per-host scoping -- see add-category-discovery-crawl.
+    var hub_url = String("https://www.azurestandard.com/shop/category/food/flour/22474")
+    var child_url = String("https://www.azurestandard.com/shop/category/food/flour/whole-wheat/22513")
+
+    var hub_outcome = upsert_site_category(
+        conn, hub_url, String("Flour"), String(""), String("www.azurestandard.com"), None
+    )
+    check(hub_outcome.created, "a new category node is created")
+
+    var child_outcome = upsert_site_category(
+        conn,
+        child_url,
+        String("Whole Wheat Flour"),
+        hub_url,
+        String("www.azurestandard.com"),
+        None,
+    )
+    check(child_outcome.created, "a second new category node is created")
+
+    var azure_categories = list_site_categories(conn, String("www.azurestandard.com"))
+    check(len(azure_categories) == 2, "both nodes are listed for their host")
+
+    var other_host_categories = list_site_categories(conn, String("example.com"))
+    check(len(other_host_categories) == 0, "an unrelated host has no listed categories")
+
+    var first_node = azure_categories[0]
+    check(first_node["has_own_products"] is None, "a freshly-discovered, not-yet-fetched node has an unknown signal")
+
+    # Re-upsert the hub with a known has_own_products signal (as if its own
+    # page was just fetched) -- must update in place, not duplicate.
+    var hub_reupsert = upsert_site_category(
+        conn, hub_url, String("Flour"), String(""), String("www.azurestandard.com"), Optional[Bool](True)
+    )
+    check(not hub_reupsert.created, "re-upserting an existing url updates it instead of duplicating")
+
+    var after_signal_known = list_site_categories(conn, String("www.azurestandard.com"))
+    check(len(after_signal_known) == 2, "still only two nodes after the re-upsert")
+    check(
+        Int(String(after_signal_known[0]["has_own_products"])) == 1,
+        "has_own_products transitions from unknown to true once the page is actually fetched",
+    )
+
+    # A later upsert that doesn't yet know the signal (e.g. discovered again
+    # as a link before its own page is re-fetched) must not downgrade an
+    # already-known signal back to unknown.
+    var hub_reupsert_unknown = upsert_site_category(
+        conn, hub_url, String("Flour"), String(""), String("www.azurestandard.com"), None
+    )
+    check(not hub_reupsert_unknown.created, "upserting again still updates the same row")
+    var after_unknown_reupsert = list_site_categories(conn, String("www.azurestandard.com"))
+    check(
+        Int(String(after_unknown_reupsert[0]["has_own_products"])) == 1,
+        "an unknown signal on upsert never overwrites an already-known has_own_products value",
+    )
 
     conn.close()
     os_mod.remove(db_path)

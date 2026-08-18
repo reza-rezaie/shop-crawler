@@ -19,6 +19,75 @@
   margin: 0;
 }
 
+.view-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.view-tabs .tab {
+  padding: 0.55rem 0.9rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.view-tabs .tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent-strong);
+}
+
+.category-tree {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding-left: 0;
+}
+
+.category-tree ul {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding-left: 1.4rem;
+  border-left: 1px solid var(--border);
+}
+
+.category-node {
+  margin-bottom: 0.5rem;
+}
+
+.category-node-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.product-signal {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.product-signal.yes {
+  background: rgba(126, 224, 138, 0.12);
+  color: var(--success);
+}
+
+.product-signal.no {
+  background: rgba(154, 161, 172, 0.12);
+  color: var(--text-dim);
+}
+
+.product-signal.unknown {
+  background: rgba(240, 185, 92, 0.12);
+  color: var(--warning);
+}
+
 .crawl-panel {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -86,6 +155,30 @@
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
+}
+
+.progress-block {
+  margin-top: 0.9rem;
+}
+
+.progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-strong);
+  transition: width 0.3s ease;
+}
+
+.progress-label {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 
 .crawl-status {

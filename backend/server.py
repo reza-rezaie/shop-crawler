@@ -42,6 +42,37 @@ def _json_bytes(obj) -> bytes:
     return json.dumps(obj).encode("utf-8")
 
 
+# Live progress for whichever crawl/discovery run is currently in flight.
+# One shared slot, not a per-job registry: the UI only ever has one crawl
+# or discovery button active at a time (disabled while its own request is
+# in flight), so there's only ever one run to report on. The dict object
+# itself is handed straight into the Mojo crawl/discovery function (as
+# request["_progress"]) -- it mutates this same object in place from
+# whatever thread is running the POST request, and a concurrent GET
+# /api/progress request (a different thread) reads it directly. Plain
+# dict reads/writes of primitives are safe here without an explicit lock:
+# CPython's GIL makes each individual get/set atomic, and progress is
+# advisory display data, not something that needs to be transactionally
+# consistent across fields.
+CURRENT_PROGRESS = {"active": False}
+
+
+def _run_with_progress(kind: str, fn, db_path, request):
+    """Reset CURRENT_PROGRESS, hand it to the Mojo call as request["_progress"]
+    so it can report live updates, and always clear `active` afterwards --
+    including on error, so a failed crawl doesn't leave the UI's progress
+    bar stuck showing an in-progress run forever."""
+    CURRENT_PROGRESS.clear()
+    CURRENT_PROGRESS["active"] = True
+    CURRENT_PROGRESS["kind"] = kind
+    request = dict(request)
+    request["_progress"] = CURRENT_PROGRESS
+    try:
+        return fn(db_path, request)
+    finally:
+        CURRENT_PROGRESS["active"] = False
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "MojoCrawlerPOC/1.0"
 
@@ -75,7 +106,17 @@ class Handler(BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length) if length else b"{}"
                 request = json.loads(raw or b"{}")
-                self._send_json(200, api.crawl(DB_PATH, request))
+                self._send_json(200, _run_with_progress("crawl", api.crawl, DB_PATH, request))
+            elif parsed.path == "/api/site-categories" and method == "GET":
+                query = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+                self._send_json(200, api.site_categories(DB_PATH, query))
+            elif parsed.path == "/api/site-categories/discover" and method == "POST":
+                length = int(self.headers.get("Content-Length", "0"))
+                raw = self.rfile.read(length) if length else b"{}"
+                request = json.loads(raw or b"{}")
+                self._send_json(200, _run_with_progress("discover", api.discover_categories, DB_PATH, request))
+            elif parsed.path == "/api/progress" and method == "GET":
+                self._send_json(200, dict(CURRENT_PROGRESS))
             else:
                 self._send_json(404, {"error": "not found"})
         except Exception as exc:  # keep the shim from ever hard-crashing

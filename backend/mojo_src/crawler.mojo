@@ -32,7 +32,7 @@ from html_extract import (
 from db import upsert_product
 
 comptime MAX_PAGES_DEFAULT = 3
-comptime MAX_PAGES_HARD_CAP = 20
+comptime MAX_PAGES_HARD_CAP = 500
 comptime MAX_DETAIL_FETCHES_DEFAULT = 60
 comptime MAX_CHILD_LINKS_PER_HUB_PAGE = 8
 
@@ -43,7 +43,14 @@ def crawl(
     max_pages: Int,
     max_detail_fetches: Int,
     fetch_descriptions: Bool,
+    progress: PythonObject,
 ) raises -> PythonObject:
+    # `progress`, when not Python None, is a mutable Python dict the HTTP
+    # layer (server.py) also holds a reference to -- writing into it here
+    # is how a concurrent GET /api/progress request on another thread sees
+    # this crawl's live state. See api.mojo/server.py for how it's wired
+    # up; this function works the same (just silently skips reporting)
+    # when called with Python None (e.g. `pixi run crawl`'s one-shot path).
     var errors = Python.list()
     var notes = Python.list()
 
@@ -56,6 +63,14 @@ def crawl(
     var capped_detail_fetches = max_detail_fetches
     if capped_detail_fetches < 0:
         capped_detail_fetches = MAX_DETAIL_FETCHES_DEFAULT
+
+    if progress is not None:
+        progress["phase"] = "pages"
+        progress["pages_visited"] = 0
+        progress["pages_total"] = capped_pages
+        progress["products_found"] = 0
+        progress["detail_index"] = 0
+        progress["detail_total"] = 0
 
     if not can_fetch(seed_url):
         errors.append("Crawling this URL is disallowed by the site's robots.txt")
@@ -80,6 +95,8 @@ def crawl(
 
         var result = fetch(current_url)
         pages_crawled += 1
+        if progress is not None:
+            progress["pages_visited"] = pages_crawled
         if not result.ok:
             errors.append("Failed to fetch " + current_url + ": " + result.error)
             continue
@@ -139,6 +156,9 @@ def crawl(
                 product.image_url = resolve_url(current_url, product.image_url)
             pending_products.append(product^)
 
+        if progress is not None:
+            progress["products_found"] = len(pending_products)
+
         if len(products) == 0 and looks_like_not_found_page(pagination_source):
             notes.append(
                 current_url
@@ -185,8 +205,15 @@ def crawl(
     var updated = 0
     var detail_fetches = 0
 
+    if progress is not None and len(pending_products) > 0:
+        progress["phase"] = "details"
+        progress["detail_total"] = len(pending_products)
+
     var i = 0
     while i < len(pending_products):
+        if progress is not None:
+            progress["detail_index"] = i + 1
+
         if fetch_descriptions and detail_fetches < capped_detail_fetches:
             var detail = fetch(pending_products[i].url)
             detail_fetches += 1
