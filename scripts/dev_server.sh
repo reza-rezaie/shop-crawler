@@ -28,6 +28,8 @@ if [ ! -f frontend/dist/index.html ]; then
     echo
 fi
 
+bash scripts/pg_local.sh ensure
+
 echo "Starting Mojo Product Crawler..."
 echo
 echo "  👉  http://localhost:$PORT"

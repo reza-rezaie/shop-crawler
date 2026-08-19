@@ -4,6 +4,8 @@
 # in the browse view (see openspec/changes/fix-product-extraction-and-browsing/).
 #
 # Run with: pixi run mojo run -I backend/mojo_src backend/mojo_src/tests/test_db.mojo
+# Needs the pixi-managed local Postgres instance running (`pixi run test`
+# starts it automatically; see scripts/pg_local.sh).
 
 from std.python import Python
 from testing import check
@@ -19,14 +21,16 @@ from models import Product
 
 
 def main() raises:
-    var pyio = Python.import_module("builtins")
-    var tempfile = Python.import_module("tempfile")
     var os_mod = Python.import_module("os")
 
-    var tmp = tempfile.mkstemp(".db")
-    var db_path = String(tmp[1])
-
-    var conn = connect(db_path)
+    # A dedicated test database (see scripts/pg_local.sh), truncated at the
+    # start of every run instead of a deleted temp file -- same "each run
+    # starts empty" isolation SQLite's tempfile.mkstemp() gave us.
+    var test_db_name = String(os_mod.environ.get("PG_TEST_DATABASE", "products_test"))
+    var conn = connect(test_db_name)
+    var setup_cur = conn.cursor()
+    setup_cur.execute("TRUNCATE products, site_categories RESTART IDENTITY")
+    conn.commit()
 
     # Two products from one site, one from another.
     _ = upsert_product(
@@ -134,7 +138,7 @@ def main() raises:
     var after_signal_known = list_site_categories(conn, String("www.azurestandard.com"))
     check(len(after_signal_known) == 2, "still only two nodes after the re-upsert")
     check(
-        Int(String(after_signal_known[0]["has_own_products"])) == 1,
+        Bool(after_signal_known[0]["has_own_products"]),
         "has_own_products transitions from unknown to true once the page is actually fetched",
     )
 
@@ -147,11 +151,10 @@ def main() raises:
     check(not hub_reupsert_unknown.created, "upserting again still updates the same row")
     var after_unknown_reupsert = list_site_categories(conn, String("www.azurestandard.com"))
     check(
-        Int(String(after_unknown_reupsert[0]["has_own_products"])) == 1,
+        Bool(after_unknown_reupsert[0]["has_own_products"]),
         "an unknown signal on upsert never overwrites an already-known has_own_products value",
     )
 
     conn.close()
-    os_mod.remove(db_path)
 
     print("All db tests passed.")

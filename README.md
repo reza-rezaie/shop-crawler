@@ -3,19 +3,21 @@
 A proof-of-concept product crawler + local browser. The backend and all
 crawling/business logic are native **Mojo v1.0 GA**; Python is only a thin
 HTTP transport shim plus a handful of standard-library calls Mojo doesn't
-natively cover yet (sqlite3, urllib, json, html, http.server), plus one
-third-party package (Playwright, for a JS-rendering crawl fallback — see
-below). See [SPEC.md](SPEC.md) for the full design and the exact
-Mojo/Python split.
+natively cover yet (urllib, json, html, http.server), plus two third-party
+packages (Playwright, for a JS-rendering crawl fallback — see below; and
+`psycopg2`, the Postgres client driver). See [SPEC.md](SPEC.md) for the full
+design and the exact Mojo/Python split.
 
 ```
-pixi.toml            # Mojo + task definitions (one third-party Python dep: playwright-python)
+pixi.toml            # Mojo + task definitions (third-party Python deps: playwright-python, psycopg2)
 scripts/activate.sh   # pixi activation hook (see "Gotcha" below)
+scripts/pg_local.sh    # manages the pixi-local Postgres instance (init/start/stop)
 backend/
-  mojo_src/            # native Mojo: crawler, HTML extraction, pricing, SQLite, API
+  mojo_src/            # native Mojo: crawler, HTML extraction, pricing, Postgres, API
   server.py             # thin Python HTTP shim + static file server
 frontend/              # React (Vite) UI
-data/products.db       # SQLite database (created on first run)
+data/products.db       # old SQLite database, kept only as a pre-migration backup
+data/pgdata/            # pixi-managed local Postgres data directory (gitignored)
 ```
 
 ## Prerequisites
@@ -23,8 +25,11 @@ data/products.db       # SQLite database (created on first run)
 - [Pixi](https://pixi.sh) (already used to provision Mojo v1.0 GA here)
 - Node.js/npm (for the React frontend build)
 
-Everything else — the Mojo compiler, and the Python interpreter the backend
-uses for interop — is installed by Pixi from `pixi.toml`.
+Everything else — the Mojo compiler, the Python interpreter the backend uses
+for interop, and Postgres itself (server + client driver) — is installed by
+Pixi from `pixi.toml`. No Docker and no system-wide Postgres install: a
+local instance is initialized under `data/pgdata/` and started automatically
+by the tasks below (see `scripts/pg_local.sh`).
 
 ## Run it
 
@@ -32,12 +37,17 @@ uses for interop — is installed by Pixi from `pixi.toml`.
 pixi run frontend-install   # once
 pixi run frontend-build     # rebuild after any frontend change
 pixi run playwright-install # once — downloads the Chromium binary used by the JS-rendering fallback
-pixi run serve              # starts the backend at http://localhost:8000
+pixi run serve              # starts the local Postgres instance (first run: initializes it), then the backend at http://localhost:8000
 ```
 
 Then open **http://localhost:8000**. If port 8000 is already taken on your
 machine, run `PORT=8010 pixi run serve` instead (or `pixi run python
 backend/server.py --port 8010`).
+
+Already have data in the old `data/products.db` from before this project
+used Postgres? Run `pixi run db-migrate` once to copy it over — see
+`scripts/migrate_sqlite_to_postgres.py`. The old file is left in place
+afterward, untouched.
 
 1. Paste a shop/category page URL into the box at the top — the app was
    built and tested against **https://books.toscrape.com** (a public
@@ -46,7 +56,7 @@ backend/server.py --port 8010`).
    `https://books.toscrape.com/catalogue/category/books/mystery_3/index.html`.
 2. Click **Crawl**. It fetches up to "Max pages" listing pages (following
    pagination), optionally visits each product's detail page for a
-   description, and stores everything in `data/products.db`.
+   description, and stores everything in Postgres.
 3. Browse, search by name, and filter by category/price/**source site**
    below (crawling more than one site keeps their products distinguishable
    instead of blending together — each card shows the site it came from).
@@ -88,9 +98,10 @@ pixi run crawl -- https://books.toscrape.com/
 pixi run test
 ```
 
-Runs the native-Mojo test suite under `backend/mojo_src/tests/` (string/
-HTML extraction correctness, SPA-shell detection, JS-rendered-DOM
-extraction, SQLite storage/filtering — see `openspec/specs/` and
+Starts the local Postgres instance (if not already running), then runs the
+native-Mojo test suite under `backend/mojo_src/tests/` (string/HTML
+extraction correctness, SPA-shell detection, JS-rendered-DOM extraction,
+Postgres storage/filtering — see `openspec/specs/` and
 `openspec/changes/archive/` for what prompted several of these).
 
 ## Notes / POC limitations
