@@ -22,7 +22,11 @@ from urllib.parse import urlparse, parse_qs
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MOJO_SRC_DIR = PROJECT_ROOT / "backend" / "mojo_src"
 DATA_DIR = PROJECT_ROOT / "data"
-DB_PATH = str(DATA_DIR / "products.db")
+# The Postgres database to connect to -- host/port/user/password come from
+# the standard libpq env vars (PGHOST/PGPORT/PGUSER/PGPASSWORD), defaulted
+# by scripts/activate.sh to the pixi-managed local instance (see
+# scripts/pg_local.sh). DB_NAME just says which database on that instance.
+DB_NAME = os.environ.get("PGDATABASE", "products")
 STATIC_DIR = PROJECT_ROOT / "frontend" / "dist"
 
 HOST = os.environ.get("HOST", "0.0.0.0")
@@ -94,27 +98,27 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             if parsed.path == "/api/health" and method == "GET":
-                self._send_json(200, api.health(DB_PATH))
+                self._send_json(200, api.health(DB_NAME))
             elif parsed.path == "/api/products" and method == "GET":
                 query = {k: v[0] for k, v in parse_qs(parsed.query).items()}
-                self._send_json(200, api.list_products(DB_PATH, query))
+                self._send_json(200, api.list_products(DB_NAME, query))
             elif parsed.path == "/api/categories" and method == "GET":
-                self._send_json(200, api.categories(DB_PATH))
+                self._send_json(200, api.categories(DB_NAME))
             elif parsed.path == "/api/sources" and method == "GET":
-                self._send_json(200, api.sources(DB_PATH))
+                self._send_json(200, api.sources(DB_NAME))
             elif parsed.path == "/api/crawl" and method == "POST":
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length) if length else b"{}"
                 request = json.loads(raw or b"{}")
-                self._send_json(200, _run_with_progress("crawl", api.crawl, DB_PATH, request))
+                self._send_json(200, _run_with_progress("crawl", api.crawl, DB_NAME, request))
             elif parsed.path == "/api/site-categories" and method == "GET":
                 query = {k: v[0] for k, v in parse_qs(parsed.query).items()}
-                self._send_json(200, api.site_categories(DB_PATH, query))
+                self._send_json(200, api.site_categories(DB_NAME, query))
             elif parsed.path == "/api/site-categories/discover" and method == "POST":
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length) if length else b"{}"
                 request = json.loads(raw or b"{}")
-                self._send_json(200, _run_with_progress("discover", api.discover_categories, DB_PATH, request))
+                self._send_json(200, _run_with_progress("discover", api.discover_categories, DB_NAME, request))
             elif parsed.path == "/api/progress" and method == "GET":
                 self._send_json(200, dict(CURRENT_PROGRESS))
             else:
@@ -181,7 +185,7 @@ def _guess_content_type(path: Path) -> str:
 
 def run_crawl_once(url: str, max_pages: int = 3) -> None:
     """`pixi run crawl` -- crawl from the command line, no server needed."""
-    result = api.crawl(DB_PATH, {"url": url, "max_pages": max_pages, "fetch_descriptions": True})
+    result = api.crawl(DB_NAME, {"url": url, "max_pages": max_pages, "fetch_descriptions": True})
     print(json.dumps(result, indent=2))
 
 
@@ -195,7 +199,7 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Mojo Crawler POC backend listening on {HOST}:{PORT}")
     print(f"Open http://localhost:{PORT} in your browser")
-    print(f"Database: {DB_PATH}")
+    print(f"Database: {DB_NAME}")
     if not (STATIC_DIR / "index.html").exists():
         print(
             "NOTE: frontend build not found at",

@@ -1,7 +1,7 @@
-# Native Mojo SQLite storage layer. SQL text assembly, upsert/query logic,
+# Native Mojo Postgres storage layer. SQL text assembly, upsert/query logic,
 # and control flow all live here; only the actual statement execution goes
-# through Python's `sqlite3` (see SPEC.md ss6 -- Mojo has no native SQLite
-# driver yet).
+# through Python's `psycopg2` (see SPEC.md ss6 -- Mojo has no native Postgres
+# driver either, same reason it had none for SQLite).
 
 from std.python import Python, PythonObject
 from models import Product
@@ -10,10 +10,10 @@ from textutil import extract_host
 
 comptime SCHEMA = """
 CREATE TABLE IF NOT EXISTS products (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product_url         TEXT NOT NULL UNIQUE,
     name                TEXT NOT NULL,
-    price               REAL,
+    price               DOUBLE PRECISION,
     currency            TEXT,
     image_url           TEXT,
     category            TEXT,
@@ -26,12 +26,12 @@ CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);
 
 CREATE TABLE IF NOT EXISTS site_categories (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     url               TEXT NOT NULL UNIQUE,
     name              TEXT NOT NULL,
     parent_url        TEXT,
     host              TEXT NOT NULL,
-    has_own_products  INTEGER,
+    has_own_products  BOOLEAN,
     first_seen_at     TEXT NOT NULL,
     last_seen_at      TEXT NOT NULL
 );
@@ -40,11 +40,26 @@ CREATE INDEX IF NOT EXISTS idx_site_categories_parent ON site_categories(parent_
 """
 
 
-def connect(db_path: String) raises -> PythonObject:
-    var sqlite3 = Python.import_module("sqlite3")
-    var conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
+def connect(db_name: String) raises -> PythonObject:
+    """Connect to the given Postgres database. Host/port/user/password come
+    from the standard libpq env vars (PGHOST/PGPORT/PGUSER/PGPASSWORD) --
+    scripts/activate.sh exports defaults pointing at the pixi-managed local
+    instance (see scripts/pg_local.sh) on every `pixi run`/`pixi shell`, so
+    this needs no argument beyond which database to use (the app database
+    vs. the test database)."""
+    var psycopg2 = Python.import_module("psycopg2")
+    var extras = Python.import_module("psycopg2.extras")
+    var os_mod = Python.import_module("os")
+    var conn = psycopg2.connect(
+        host=os_mod.environ.get("PGHOST", "127.0.0.1"),
+        port=os_mod.environ.get("PGPORT", "5544"),
+        dbname=db_name,
+        user=os_mod.environ.get("PGUSER", "postgres"),
+        password=os_mod.environ.get("PGPASSWORD", ""),
+        cursor_factory=extras.RealDictCursor,
+    )
+    var cur = conn.cursor()
+    cur.execute(SCHEMA)
     conn.commit()
     return conn
 
@@ -61,13 +76,12 @@ def _none_or_str(value: String) raises -> PythonObject:
     return PythonObject(value)
 
 
-def _none_or_bool_as_int(value: Optional[Bool]) raises -> PythonObject:
-    """NULL for unknown, else 0/1 -- how has_own_products' tri-state is
-    represented in SQLite (no native boolean/nullable-bool type)."""
+def _none_or_bool(value: Optional[Bool]) raises -> PythonObject:
+    """NULL for unknown, else the real boolean -- Postgres (unlike SQLite)
+    has a native nullable BOOLEAN, so has_own_products' tri-state no longer
+    needs an int-as-bool workaround."""
     if value:
-        if value.value():
-            return PythonObject(1)
-        return PythonObject(0)
+        return PythonObject(value.value())
     return Python.none()
 
 
@@ -81,51 +95,31 @@ struct UpsertOutcome(Copyable, Movable):
 def upsert_product(conn: PythonObject, product: Product) raises -> UpsertOutcome:
     """Insert a new product, or update an existing one (matched by
     product_url) in place -- this is what makes re-crawling idempotent
-    instead of creating duplicates."""
-    var existing = conn.execute(
-        "SELECT id FROM products WHERE product_url = ?",
-        Python.tuple(product.url),
-    ).fetchone()
-
+    instead of creating duplicates. One atomic `INSERT ... ON CONFLICT DO
+    UPDATE` instead of a separate SELECT-then-branch: no race window
+    between two concurrent upserts of the same product_url. `xmax = 0` on
+    the RETURNING row is the standard Postgres idiom for "this row was just
+    inserted, not updated" -- it's how UpsertOutcome.created is read back
+    without a second round-trip."""
     var now = now_iso()
-
-    if existing is None:
-        conn.execute(
-            """INSERT INTO products
-                (product_url, name, price, currency, image_url, category,
-                 description, source_listing_url, first_seen_at, last_seen_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            Python.tuple(
-                product.url,
-                product.name,
-                _none_or(product.price),
-                _none_or_str(product.currency),
-                _none_or_str(product.image_url),
-                _none_or_str(product.category),
-                _none_or_str(product.description),
-                product.source_listing_url,
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-        return UpsertOutcome(True)
-
-    # Update, but don't blank out a field we already had (e.g. a re-crawl
-    # of the listing page alone shouldn't erase a description that was only
-    # ever available from the detail page).
-    conn.execute(
-        """UPDATE products SET
-            name = ?,
-            price = COALESCE(?, price),
-            currency = COALESCE(?, currency),
-            image_url = COALESCE(?, image_url),
-            category = COALESCE(?, category),
-            description = COALESCE(?, description),
-            source_listing_url = ?,
-            last_seen_at = ?
-           WHERE product_url = ?""",
+    var cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO products
+            (product_url, name, price, currency, image_url, category,
+             description, source_listing_url, first_seen_at, last_seen_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           ON CONFLICT (product_url) DO UPDATE SET
+               name = EXCLUDED.name,
+               price = COALESCE(EXCLUDED.price, products.price),
+               currency = COALESCE(EXCLUDED.currency, products.currency),
+               image_url = COALESCE(EXCLUDED.image_url, products.image_url),
+               category = COALESCE(EXCLUDED.category, products.category),
+               description = COALESCE(EXCLUDED.description, products.description),
+               source_listing_url = EXCLUDED.source_listing_url,
+               last_seen_at = EXCLUDED.last_seen_at
+           RETURNING (xmax = 0) AS inserted""",
         Python.tuple(
+            product.url,
             product.name,
             _none_or(product.price),
             _none_or_str(product.currency),
@@ -134,11 +128,12 @@ def upsert_product(conn: PythonObject, product: Product) raises -> UpsertOutcome
             _none_or_str(product.description),
             product.source_listing_url,
             now,
-            product.url,
+            now,
         ),
     )
+    var row = cur.fetchone()
     conn.commit()
-    return UpsertOutcome(False)
+    return UpsertOutcome(Bool(row["inserted"]))
 
 
 def upsert_site_category(
@@ -159,59 +154,43 @@ def upsert_site_category(
     (unknown, because its own page hasn't been fetched yet) must not wipe
     out a true/false signal an earlier discovery run already established
     for that same URL."""
-    var existing = conn.execute(
-        "SELECT id FROM site_categories WHERE url = ?",
-        Python.tuple(url),
-    ).fetchone()
-
     var now = now_iso()
-
-    if existing is None:
-        conn.execute(
-            """INSERT INTO site_categories
-                (url, name, parent_url, host, has_own_products, first_seen_at, last_seen_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            Python.tuple(
-                url,
-                name,
-                _none_or_str(parent_url),
-                host,
-                _none_or_bool_as_int(has_own_products),
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-        return UpsertOutcome(True)
-
-    conn.execute(
-        """UPDATE site_categories SET
-            name = ?,
-            parent_url = ?,
-            host = ?,
-            has_own_products = COALESCE(?, has_own_products),
-            last_seen_at = ?
-           WHERE url = ?""",
+    var cur = conn.cursor()
+    cur.execute(
+        """INSERT INTO site_categories
+            (url, name, parent_url, host, has_own_products, first_seen_at, last_seen_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s)
+           ON CONFLICT (url) DO UPDATE SET
+               name = EXCLUDED.name,
+               parent_url = EXCLUDED.parent_url,
+               host = EXCLUDED.host,
+               has_own_products = COALESCE(EXCLUDED.has_own_products, site_categories.has_own_products),
+               last_seen_at = EXCLUDED.last_seen_at
+           RETURNING (xmax = 0) AS inserted""",
         Python.tuple(
+            url,
             name,
             _none_or_str(parent_url),
             host,
-            _none_or_bool_as_int(has_own_products),
+            _none_or_bool(has_own_products),
             now,
-            url,
+            now,
         ),
     )
+    var row = cur.fetchone()
     conn.commit()
-    return UpsertOutcome(False)
+    return UpsertOutcome(Bool(row["inserted"]))
 
 
 def list_site_categories(conn: PythonObject, host: String) raises -> PythonObject:
     """Every category node discovered for one host, in discovery order --
     the tree view groups these by parent_url client-side."""
-    var rows = conn.execute(
-        "SELECT id, url, name, parent_url, has_own_products FROM site_categories WHERE host = ? ORDER BY id ASC",
+    var cur = conn.cursor()
+    cur.execute(
+        "SELECT id, url, name, parent_url, has_own_products FROM site_categories WHERE host = %s ORDER BY id ASC",
         Python.tuple(host),
-    ).fetchall()
+    )
+    var rows = cur.fetchall()
     var out = Python.list()
     for row in rows:
         var item = Python.dict()
@@ -225,14 +204,18 @@ def list_site_categories(conn: PythonObject, host: String) raises -> PythonObjec
 
 
 def count_products(conn: PythonObject) raises -> Int:
-    var row = conn.execute("SELECT COUNT(*) AS n FROM products").fetchone()
+    var cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) AS n FROM products")
+    var row = cur.fetchone()
     return Int(String(row["n"]))
 
 
 def list_categories(conn: PythonObject) raises -> PythonObject:
-    var rows = conn.execute(
+    var cur = conn.cursor()
+    cur.execute(
         "SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category"
-    ).fetchall()
+    )
+    var rows = cur.fetchall()
     var out = Python.list()
     for row in rows:
         out.append(row["category"])
@@ -245,7 +228,9 @@ def list_sources(conn: PythonObject) raises -> PythonObject:
     the browse view offer "which site is this from" as a filter, and lets
     a user visually confirm which products came from which crawl instead
     of everything blending into one undifferentiated list."""
-    var rows = conn.execute("SELECT DISTINCT source_listing_url FROM products").fetchall()
+    var cur = conn.cursor()
+    cur.execute("SELECT DISTINCT source_listing_url FROM products")
+    var rows = cur.fetchall()
     var seen = Dict[String, Bool]()
     var hosts = List[String]()
     for row in rows:
@@ -279,26 +264,29 @@ def query_products(
     var params = Python.list()
 
     if search.byte_length() > 0:
-        where_clauses.append(String("name LIKE ?"))
+        # ILIKE, not LIKE: Postgres's LIKE is case-sensitive (unlike
+        # SQLite's default), and product-browsing's search requirement is
+        # explicitly case-insensitive.
+        where_clauses.append(String("name ILIKE %s"))
         params.append("%" + search + "%")
 
     if category.byte_length() > 0:
-        where_clauses.append(String("category = ?"))
+        where_clauses.append(String("category = %s"))
         params.append(category)
 
     if min_price:
-        where_clauses.append(String("price >= ?"))
+        where_clauses.append(String("price >= %s"))
         params.append(min_price.value())
 
     if max_price:
-        where_clauses.append(String("price <= ?"))
+        where_clauses.append(String("price <= %s"))
         params.append(max_price.value())
 
     if source_host.byte_length() > 0:
         # source_listing_url is stored as a full URL, not a bare host, so
         # match it as "<scheme>://<host>/..." or exactly "<scheme>://<host>".
         where_clauses.append(
-            String("(source_listing_url LIKE ? OR source_listing_url = ? OR source_listing_url = ?)")
+            String("(source_listing_url LIKE %s OR source_listing_url = %s OR source_listing_url = %s)")
         )
         params.append("%://" + source_host + "/%")
         params.append("http://" + source_host)
@@ -308,8 +296,11 @@ def query_products(
     if len(where_clauses) > 0:
         where_sql = " WHERE " + " AND ".join(where_clauses)
 
+    var cur = conn.cursor()
+
     var count_sql = "SELECT COUNT(*) AS n FROM products" + where_sql
-    var total_row = conn.execute(count_sql, params).fetchone()
+    cur.execute(count_sql, params)
+    var total_row = cur.fetchone()
     var total = Int(String(total_row["n"]))
 
     var safe_page = page
@@ -325,12 +316,13 @@ def query_products(
     var list_sql = (
         "SELECT * FROM products"
         + where_sql
-        + " ORDER BY last_seen_at DESC, id DESC LIMIT ? OFFSET ?"
+        + " ORDER BY last_seen_at DESC, id DESC LIMIT %s OFFSET %s"
     )
     var list_params = params
     list_params.append(safe_page_size)
     list_params.append(offset)
-    var rows = conn.execute(list_sql, list_params).fetchall()
+    cur.execute(list_sql, list_params)
+    var rows = cur.fetchall()
 
     var items = Python.list()
     for row in rows:

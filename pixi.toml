@@ -12,19 +12,28 @@ scripts = ["scripts/activate.sh"]
 
 [tasks]
 # Start the backend (Mojo business logic + a thin Python HTTP server).
-serve = "python backend/server.py"
+# Ensures the pixi-managed local Postgres instance is up first (see
+# scripts/pg_local.sh) -- there's no external service to install by hand.
+serve = "bash scripts/pg_local.sh ensure && python backend/server.py"
 # Convenience launcher: fixed, unusual port (avoids clashing with other
 # local dev servers), builds the frontend first if needed, prints the URL
 # to open. Override the port with e.g. `PORT=8935 pixi run dev`.
 dev = "bash scripts/dev_server.sh"
 # One-shot crawl from the command line, without the web UI.
-crawl = "python backend/server.py --crawl-once"
+crawl = "bash scripts/pg_local.sh ensure && python backend/server.py --crawl-once"
 # Native-Mojo test suite (see backend/mojo_src/tests/).
-test = "bash scripts/run_tests.sh"
+test = "bash scripts/pg_local.sh ensure && bash scripts/run_tests.sh"
 # One-time setup: downloads the Chromium binary Playwright needs for the
 # JS-rendering crawl fallback (browser_client.mojo). Not a Conda package,
 # so it isn't pulled in by `pixi install` -- run this once per environment.
 playwright-install = "playwright install chromium"
+# Manage the pixi-managed local Postgres instance directly (start/stop
+# without also launching the server) -- e.g. to run `psql` against it.
+pg-start = "bash scripts/pg_local.sh ensure"
+pg-stop = "bash scripts/pg_local.sh stop"
+# One-time: copy data/products.db's existing rows into the Postgres catalog.
+# See scripts/migrate_sqlite_to_postgres.py.
+db-migrate = "bash scripts/pg_local.sh ensure && python scripts/migrate_sqlite_to_postgres.py"
 # Frontend dev/build helpers (Node/npm, used only for the React UI).
 frontend-install = { cmd = "npm install", cwd = "frontend" }
 frontend-build = { cmd = "npm run build", cwd = "frontend" }
@@ -38,6 +47,18 @@ mojo = ">=1.0.0,<2"
 # Note the package name -- on conda-forge, plain "playwright" is the
 # Node.js CLI/library, not the Python bindings.
 playwright-python = ">=1.62.0,<2"
+# Postgres client driver (db.mojo, via Mojo's Python interop) and the
+# server binaries themselves (initdb/pg_ctl/psql, driven by
+# scripts/pg_local.sh) -- see openspec/changes/switch-to-postgres.
+psycopg2 = ">=2.9.0,<3"
+# Pinned below 18: conda-forge's postgresql/libpq 18.x builds link
+# `liburing`, whose mere presence in this environment segfaults Mojo's
+# compiled Python-extension-module loading (`PyInit_*`, used by
+# server.py's `import api`) -- confirmed by bisecting the exact dependency
+# that introduces it. 17.x doesn't link liburing and has none of this
+# issue. Revisit this pin if a future postgresql/libpq build drops the
+# liburing dependency, or ships it opt-in.
+postgresql = ">=17,<18"
 # Everything else the backend uses via Mojo's Python interop is Python's
-# standard library (sqlite3, urllib, http.server, json, html) -- see
-# SPEC.md for the full breakdown of what's native Mojo vs. Python interop.
+# standard library (urllib, http.server, json, html) -- see SPEC.md for
+# the full breakdown of what's native Mojo vs. Python interop.

@@ -5,6 +5,7 @@
 # Backend data
 data/*.db
 data/*.db-journal
+data/pgdata/
 
 # Frontend
 frontend/node_modules/

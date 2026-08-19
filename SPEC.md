@@ -1,12 +1,13 @@
 # SPEC — Mojo Product Crawler POC
 
 A proof-of-concept web app that crawls product listings from a shop/category
-page, stores them in SQLite, and lets you browse/search/filter them locally.
-Primary backend logic — crawling, HTML extraction, price parsing, filtering,
-and SQL access — is written in **native Mojo v1.0 GA**. Python is used only
-as a thin transport shim and for facilities Mojo does not yet provide —
-almost entirely its standard library, plus one third-party package
-(Playwright, for a JS-rendering fallback — see §6).
+page, stores them in Postgres, and lets you browse/search/filter them
+locally. Primary backend logic — crawling, HTML extraction, price parsing,
+filtering, and SQL access — is written in **native Mojo v1.0 GA**. Python is
+used only as a thin transport shim and for facilities Mojo does not yet
+provide — almost entirely its standard library, plus two third-party
+packages (Playwright, for a JS-rendering fallback — see §6; and `psycopg2`,
+the Postgres client driver).
 
 Primary test target: **https://books.toscrape.com** — a public sandbox site
 built specifically for scraping practice (fictional bookstore, no robots.txt
@@ -40,11 +41,12 @@ fixing a reported bug.
                                                        │  — all native Mojo control flow — │
                                                        └──────────────┬────────────────┘
                                                                       │ Python interop
-                                                                      │ (sqlite3, urllib,
+                                                                      │ (psycopg2, urllib,
                                                                       │  json, html, time)
                                                                       ▼
                                                        ┌───────────────────────────────┐
-                                                       │  data/products.db (SQLite)     │
+                                                       │  Postgres (pixi-managed local   │
+                                                       │  instance, or PGHOST/PGPORT/…)  │
                                                        └───────────────────────────────┘
 ```
 
@@ -66,14 +68,15 @@ calls are calls into compiled Mojo code, not a subprocess or RPC.
 
 ## 2. Database model
 
-SQLite file at `data/products.db`, one table:
+Postgres, one table (plus `site_categories` — see
+`openspec/specs/category-discovery/spec.md`):
 
 ```sql
 CREATE TABLE products (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     product_url     TEXT NOT NULL UNIQUE,   -- de-dup key
     name            TEXT NOT NULL,
-    price           REAL,                   -- normalized numeric price, nullable
+    price           DOUBLE PRECISION,       -- normalized numeric price, nullable
     currency        TEXT,                   -- symbol/code found near the price, e.g. "£"
     image_url       TEXT,
     category        TEXT,                   -- from breadcrumb, when available
@@ -87,9 +90,19 @@ CREATE INDEX idx_products_price ON products(price);
 ```
 
 Re-crawling the same listing does an **upsert keyed on `product_url`**
-(`INSERT ... ON CONFLICT(product_url) DO UPDATE`), so existing products are
+(`INSERT ... ON CONFLICT (product_url) DO UPDATE`), so existing products are
 refreshed in place (price/name/image/description/last_seen_at) instead of
-duplicated.
+duplicated — one atomic statement, not a separate SELECT-then-branch.
+
+Local dev/CI run against a **pixi-managed local Postgres instance** (no
+Docker, no manual install) — see `scripts/pg_local.sh`, started automatically
+by `pixi run dev`/`serve`/`test`. Connection settings come from the standard
+libpq env vars (`PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`), which
+`scripts/activate.sh` defaults to that local instance. Pinned to Postgres
+17.x (`pixi.toml`): conda-forge's 18.x `postgresql`/`libpq` build links
+`liburing`, whose mere presence in the pixi environment crashes Mojo's
+compiled Python-extension-module loading (`import mojo.importer; import
+api`) — confirmed by bisecting the exact dependency that introduces it.
 
 ## 3. API endpoints
 
@@ -180,7 +193,7 @@ for the test site.
 5. **Price normalization** (native Mojo): strip currency symbols/whitespace,
    drop thousands separators, parse the remaining digits/`.` as `Float64`;
    the leading non-digit run is kept separately as `currency`.
-6. **Store**: upsert each product into SQLite (§2).
+6. **Store**: upsert each product into Postgres (§2).
 
 ## 5. Native Mojo
 
@@ -200,7 +213,7 @@ Everything under `backend/mojo_src/`:
   same shape `http_client.fetch` returns so callers don't special-case it.
 - `db.mojo` — schema init, upsert, filtered query building, category listing
   (SQL text assembly and control flow are Mojo; execution goes through
-  Python's `sqlite3` via interop).
+  Python's `psycopg2` via interop).
 - `crawler.mojo` — orchestrates the above into one crawl run.
 - `api.mojo` — the only file exporting a `PyInit_api()`; the functions
   Python calls (`health`, `crawl`, `list_products`, `categories`,
@@ -224,9 +237,9 @@ Python; Python.import_module(...)`:
 | URL joining | `urllib.parse` (stdlib) | No stable Mojo URL library |
 | JSON-LD parsing | `json` (stdlib) | No native Mojo JSON parser yet |
 | HTML entity unescaping | `html` (`html.unescape`, stdlib) | Small stdlib convenience, avoids reimplementing entity tables |
-| Storage | `sqlite3` (stdlib) | No native Mojo SQLite driver |
+| Storage | `psycopg2` (**third-party Python package**, via Pixi) | No native Mojo Postgres driver |
 | Rate-limit delay | `time.sleep` (stdlib) | No stable Mojo sleep primitive exposed for this use |
-| JS-rendering fallback | `playwright.sync_api` (**the one third-party Python package**, `playwright-python` via Pixi) | No Mojo (or pure-HTTP) way to execute a page's client-side JavaScript; isolated entirely to `browser_client.mojo`, only invoked as a fallback for pages that need it |
+| JS-rendering fallback | `playwright.sync_api` (**third-party Python package**, `playwright-python` via Pixi) | No Mojo (or pure-HTTP) way to execute a page's client-side JavaScript; isolated entirely to `browser_client.mojo`, only invoked as a fallback for pages that need it |
 
 Separately, `backend/server.py` is a **plain Python file**, not Mojo calling
 out — it exists because Mojo 1.0 GA has no mature HTTP *server* library
@@ -240,10 +253,11 @@ lives in Mojo and is reached via `import mojo.importer`, which compiles
 `PythonModuleBuilder` mechanism) rather than shelling out or reimplementing
 the app in Python.
 
-No pip/Poetry/Conda/venv is used anywhere; Pixi manages the Mojo toolchain,
-and the only Python involved is the interpreter that ships as part of the
-`mojo`/`mojo-python` conda packages Pixi already installs — no extra Python
-dependencies are declared because only the standard library is used.
+No pip/Poetry/venv is used anywhere; Pixi manages the whole toolchain as
+Conda packages — the Python interpreter that ships as part of the
+`mojo`/`mojo-python` packages, the two third-party Python packages above
+(`playwright-python`, `psycopg2`), and the Postgres server itself
+(`postgresql`, providing `initdb`/`pg_ctl`/`psql` for `scripts/pg_local.sh`).
 
 ## 7. Implementation steps
 

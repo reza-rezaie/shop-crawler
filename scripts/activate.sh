@@ -13,3 +13,15 @@ if [ -n "${CONDA_PREFIX:-}" ]; then
         export MOJO_PYTHON_LIBRARY="${libpython}"
     fi
 fi
+
+# Postgres connection defaults for the pixi-managed local instance (see
+# scripts/pg_local.sh) -- only applied if not already set, so pointing at a
+# different Postgres (a managed instance, someone else's local server) is
+# just exporting these yourself before `pixi run ...`. db.mojo's connect()
+# and pg_local.sh both read these, so they always agree on where the
+# instance lives without duplicating the port/db names in two places.
+export PGHOST="${PGHOST:-127.0.0.1}"
+export PGPORT="${PGPORT:-5544}"
+export PGDATABASE="${PGDATABASE:-products}"
+export PGUSER="${PGUSER:-$(whoami)}"
+export PG_TEST_DATABASE="${PG_TEST_DATABASE:-products_test}"
