@@ -325,13 +325,6 @@ function ProductCard({ product }) {
       target="_blank"
       rel="noreferrer"
     >
-      <div className="product-thumb">
-        {product.image_url ? (
-          <img src={product.image_url} alt={product.name} loading="lazy" />
-        ) : (
-          <span className="placeholder">No image</span>
-        )}
-      </div>
       <div className="product-body">
         {product.source_host && (
           <div className="product-source" title="Crawled from this site">
