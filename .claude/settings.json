@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR}/.claude/hooks/block-edit-on-main.sh\"",
+            "statusMessage": "Checking branch before edit..."
+          }
+        ]
+      }
+    ]
+  }
+}
