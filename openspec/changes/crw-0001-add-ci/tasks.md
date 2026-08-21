@@ -28,9 +28,13 @@
 
 ## 3. Branch protection
 
-- [ ] 3.1 Once the workflow has passed at least once, enable a branch
+- [x] 3.1 Once the workflow has passed at least once, enable a branch
       protection rule on `main` requiring the CI workflow's status check
       to pass before merging.
+      → Enabled via `gh api` PUT to
+      `repos/reza-rezaie/shop-crawler/branches/main/protection`: required
+      status check `ci`, strict (must be up to date with `main`),
+      `enforce_admins: false`.
 
 ## 4. Documentation
 
