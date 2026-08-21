@@ -104,6 +104,17 @@ extraction correctness, SPA-shell detection, JS-rendered-DOM extraction,
 Postgres storage/filtering — see `openspec/specs/` and
 `openspec/changes/archive/` for what prompted several of these).
 
+### CI
+
+```bash
+pixi run ci
+```
+
+Runs everything the GitHub Actions workflow (`.github/workflows/ci.yml`)
+runs on every push/PR to `main` — the native-Mojo test suite, the frontend
+lint (`oxlint`), and the frontend build — so you can catch a failure
+locally before pushing. Pull requests are gated on that workflow passing.
+
 ## Notes / POC limitations
 
 - The crawl endpoint runs synchronously and is capped (default 3 pages,
