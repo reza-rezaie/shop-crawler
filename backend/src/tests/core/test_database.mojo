@@ -1,15 +1,15 @@
-# Tests for db.mojo's source-site attribution: upsert dedup, the
+# Tests for database.mojo's source-site attribution: upsert dedup, the
 # source_host derived per item, the source_host filter, and list_sources
 # -- added so a catalog spanning multiple crawled sites can be told apart
 # in the browse view (see openspec/changes/fix-product-extraction-and-browsing/).
 #
-# Run with: pixi run mojo run -I backend/mojo_src backend/mojo_src/tests/test_db.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/core/test_database.mojo
 # Needs the pixi-managed local Postgres instance running (`pixi run test`
 # starts it automatically; see scripts/pg_local.sh).
 
 from std.python import Python
-from testing import check
-from db import (
+from tests.testing import check
+from core.database import (
     connect,
     upsert_product,
     query_products,
@@ -17,7 +17,7 @@ from db import (
     upsert_site_category,
     list_site_categories,
 )
-from models import Product
+from core.models import Product
 
 
 def main() raises:

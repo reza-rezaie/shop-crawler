@@ -31,13 +31,18 @@ fixing a reported bug.
                                                        └──────────────────────────┼───────┘
                                                                                   ▼
                                                        ┌───────────────────────────────┐
-                                                       │  backend/mojo_src/api.mojo     │
+                                                       │  backend/src/api.mojo          │
                                                        │  Python-callable Mojo module    │
                                                        │  (built via `mojo.importer`)    │
                                                        ├───────────────────────────────┤
-                                                       │  crawler.mojo   html_extract.mojo│
-                                                       │  pricing.mojo   textutil.mojo    │
-                                                       │  http_client.mojo   db.mojo       │
+                                                       │  modules/  — one dir per         │
+                                                       │    capability (vertical slice):  │
+                                                       │    product_extraction/           │
+                                                       │    category_discovery/           │
+                                                       │    product_browsing/             │
+                                                       │  core/  — shared kernel:          │
+                                                       │    database.mojo  http_client.mojo│
+                                                       │    text_utils.mojo  page_signals  │
                                                        │  — all native Mojo control flow — │
                                                        └──────────────┬────────────────┘
                                                                       │ Python interop
@@ -197,27 +202,43 @@ for the test site.
 
 ## 5. Native Mojo
 
-Everything under `backend/mojo_src/`:
-- `models.mojo` — `Product` struct and related value types.
-- `textutil.mojo` — byte-level string scanning helpers (find-all, tag/attr
-  extraction, depth-matched block extraction, whitespace/entity cleanup,
-  URL path structure helpers used for category drill-down).
-- `pricing.mojo` — price-string → `(Float64, currency)` normalization.
-- `html_extract.mojo` — listing/detail page parsing, pagination + breadcrumb
-  + child-category-link + not-found-page discovery, using `textutil`
-  (plus Python's `json` for the JSON-LD path).
-- `http_client.mojo` — thin Mojo-side wrappers around `urllib`/`robotparser`
-  calls (URL building, robots check, rate-limited fetch loop).
-- `browser_client.mojo` — the JS-rendering fallback: launches headless
-  Chromium via Playwright, navigates, waits, returns rendered HTML in the
-  same shape `http_client.fetch` returns so callers don't special-case it.
-- `db.mojo` — schema init, upsert, filtered query building, category listing
-  (SQL text assembly and control flow are Mojo; execution goes through
-  Python's `psycopg2` via interop).
-- `crawler.mojo` — orchestrates the above into one crawl run.
-- `api.mojo` — the only file exporting a `PyInit_api()`; the functions
-  Python calls (`health`, `crawl`, `list_products`, `categories`,
-  `sources`).
+Everything under `backend/src/`, organized as a **modular monolith with
+vertical slices**: one `modules/<capability>/` directory per
+`openspec/specs/` capability, each owning its own request handling and
+business logic, plus a `core/` shared kernel for what's genuinely used by
+more than one capability (all in one Postgres instance, one HTTP-fetch
+layer). See `openspec/changes/chg-0001-2026-08-21-modular-monolith-vertical-slice/`
+for the restructuring rationale — this was originally one flat directory of
+files organized by technical layer.
+
+```
+backend/src/
+├── api.mojo                          # only file exporting PyInit_api(); pure wiring +
+│                                        health/migrate_* (not feature-owned, see below)
+├── core/                              # shared kernel, not a module
+│   ├── models.mojo                     # Product struct and related value types
+│   ├── http_client.mojo                 # urllib/robotparser wrappers, rate-limited fetch loop
+│   ├── browser_client.mojo               # JS-rendering fallback (headless Chromium/Playwright)
+│   ├── text_utils.mojo                    # byte-level string/HTML scanning helpers
+│   ├── database.mojo                       # schema init, upsert, filtered query building (psycopg2 via interop)
+│   ├── page_signals.mojo                    # SPA-shell/not-found/pagination/child-link detection
+│   └── request.mojo                          # PythonObject request/param-dict parsing helpers
+└── modules/
+    ├── product_extraction/                # crawl orchestration + HTML→Product extraction
+    │   ├── crawler.mojo                      # orchestrates one crawl run
+    │   ├── extraction.mojo                    # JSON-LD + heuristic product extraction, breadcrumb, description
+    │   └── pricing.mojo                        # price-string -> (Float64, currency) normalization
+    ├── category_discovery/                # site category-tree crawl, independent of product crawling
+    │   └── discovery.mojo
+    └── product_browsing/                  # query/filter/list already-stored products
+        └── browsing.mojo
+```
+
+`page_signals.mojo` lives in `core/` rather than under `product_extraction/`
+because `category_discovery` needs the same "is this page really rendered /
+a 404 / does it have more pages" signals crawling does, even though it
+extracts no products of its own — putting it in `core/` avoids one module
+importing another module's internals.
 
 This is essentially the entire backend: request handling logic, HTML
 parsing/extraction, price parsing, pagination, dedup/upsert decisions,

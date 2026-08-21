@@ -21,7 +21,7 @@ serve = "bash scripts/pg_local.sh ensure && python backend/server.py"
 dev = "bash scripts/dev_server.sh"
 # One-shot crawl from the command line, without the web UI.
 crawl = "bash scripts/pg_local.sh ensure && python backend/server.py --crawl-once"
-# Native-Mojo test suite (see backend/mojo_src/tests/).
+# Native-Mojo test suite (see backend/src/tests/).
 test = "bash scripts/pg_local.sh ensure && bash scripts/run_tests.sh"
 # One-time setup: downloads the Chromium binary Playwright needs for the
 # JS-rendering crawl fallback (browser_client.mojo). Not a Conda package,

@@ -1,6 +1,6 @@
 """Thin Python HTTP shim -- NOT where the application logic lives.
 
-Everything under mojo_src/ (crawling, HTML extraction, price parsing,
+Everything under src/ (crawling, HTML extraction, price parsing,
 filtering, SQL, dedup/upsert) is native Mojo, compiled on the fly and
 imported here via `mojo.importer` (Mojo's official Python<->Mojo bridge).
 This file's only two jobs are:
@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MOJO_SRC_DIR = PROJECT_ROOT / "backend" / "mojo_src"
+MOJO_SRC_DIR = PROJECT_ROOT / "backend" / "src"
 DATA_DIR = PROJECT_ROOT / "data"
 # The Postgres database to connect to -- host/port/user/password come from
 # the standard libpq env vars (PGHOST/PGPORT/PGUSER/PGPASSWORD), defaulted

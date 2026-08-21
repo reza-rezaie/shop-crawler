@@ -1,35 +1,38 @@
 # Native Mojo crawl orchestration: fetch -> extract -> discover more pages
 # -> (optionally) fetch descriptions -> upsert. This is the one place that
-# ties together http_client.mojo, html_extract.mojo, pricing.mojo (via
-# html_extract), browser_client.mojo, and db.mojo. The only Python interop
-# used directly here is building the summary as a Python dict (so api.mojo
-# can hand it straight back to the HTTP layer).
+# ties together core/http_client.mojo, modules/product_extraction/extraction.mojo,
+# modules/product_extraction/pricing.mojo (via extraction), core/browser_client.mojo,
+# and core/database.mojo. The only Python interop used directly here is
+# building the summary as a Python dict (so api.mojo can hand it straight
+# back to the HTTP layer).
 #
 # "More pages" comes from two sources, treated uniformly as one work queue:
 # same-listing pagination (a page that had products, following its
 # `<link rel="next">`-style link), and category "drill-down" (a page that
 # had *no* products of its own, following same-host links nested under its
-# own URL path -- see html_extract.find_child_links). Both count against
-# the same overall `max_pages` budget. See openspec/changes/archive/
+# own URL path -- see core/page_signals.find_child_links). Both count
+# against the same overall `max_pages` budget. See openspec/changes/archive/
 # ...-add-category-drill-down-crawling/ for why this replaced a simpler
 # linear pagination-only walk.
 
 from std.python import Python, PythonObject
-from models import Product
-from http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
-from browser_client import render_fetch
-from html_extract import (
-    extract_json_ld_products,
-    extract_heuristic_products,
+from core.models import Product
+from core.http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
+from core.browser_client import render_fetch
+from core.page_signals import (
     find_next_page_url,
-    extract_breadcrumb_category,
-    extract_last_breadcrumb_items,
-    extract_product_description,
     looks_like_client_rendered_app,
     looks_like_not_found_page,
     find_child_links,
 )
-from db import upsert_product
+from modules.product_extraction.extraction import (
+    extract_json_ld_products,
+    extract_heuristic_products,
+    extract_breadcrumb_category,
+    extract_last_breadcrumb_items,
+    extract_product_description,
+)
+from core.database import upsert_product
 
 comptime MAX_PAGES_DEFAULT = 3
 comptime MAX_PAGES_HARD_CAP = 500
