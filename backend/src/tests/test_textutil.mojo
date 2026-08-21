@@ -5,11 +5,11 @@
 # mistaken for a real product card. See openspec/changes/
 # fix-product-extraction-and-browsing/ for the full writeup.
 #
-# Run with: pixi run mojo run -I backend/mojo_src backend/mojo_src/tests/test_textutil.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/test_textutil.mojo
 
 from std.python import Python
 from testing import check
-from textutil import (
+from core.text_utils import (
     class_hint_matches,
     is_valid_class_token,
     extract_attr,
@@ -72,7 +72,7 @@ def test_azurestandard_fixture_no_false_positive() raises:
     azurestandard.com SPA-shell markup for "product"-hinted div/li blocks
     must find zero matches (previously it found the favorite-heart div)."""
     var pyio = Python.import_module("builtins")
-    var f = pyio.open("backend/mojo_src/tests/fixtures/spa_shell_angular.html", "r", encoding="utf-8")
+    var f = pyio.open("backend/src/tests/fixtures/spa_shell_angular.html", "r", encoding="utf-8")
     var html = String(f.read())
     f.close()
 
@@ -87,7 +87,7 @@ def test_books_toscrape_fixture_still_matches() raises:
     """Regression: the class-token fix must not break matching on real,
     non-templated class names like books.toscrape.com's `product_pod`."""
     var pyio = Python.import_module("builtins")
-    var f = pyio.open("backend/mojo_src/tests/fixtures/books_toscrape_listing.html", "r", encoding="utf-8")
+    var f = pyio.open("backend/src/tests/fixtures/books_toscrape_listing.html", "r", encoding="utf-8")
     var html = String(f.read())
     f.close()
 

@@ -6,17 +6,17 @@
 # HTML, plus the two small robustness additions this change made (ng-src
 # image fallback, div-wrapped price).
 #
-# Run with: pixi run mojo run -I backend/mojo_src backend/mojo_src/tests/test_js_rendered_extraction.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/test_js_rendered_extraction.mojo
 
 from std.python import Python
 from testing import check
 from html_extract import extract_heuristic_products, extract_breadcrumb_category
-from textutil import extract_attr, extract_first_void_tag
+from core.text_utils import extract_attr, extract_first_void_tag
 
 
 def _read_fixture(name: String) raises -> String:
     var pyio = Python.import_module("builtins")
-    var f = pyio.open("backend/mojo_src/tests/fixtures/" + name, "r", encoding="utf-8")
+    var f = pyio.open("backend/src/tests/fixtures/" + name, "r", encoding="utf-8")
     var content = String(f.read())
     f.close()
     return content

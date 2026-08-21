@@ -5,7 +5,7 @@
 # category-tree structure underneath its working category pages. See
 # openspec/changes/archive/...-add-category-drill-down-crawling/.
 #
-# Run with: pixi run mojo run -I backend/mojo_src backend/mojo_src/tests/test_category_drill_down.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/test_category_drill_down.mojo
 
 from std.python import Python
 from testing import check
@@ -14,7 +14,7 @@ from html_extract import looks_like_not_found_page, find_child_links
 
 def _read_fixture(name: String) raises -> String:
     var pyio = Python.import_module("builtins")
-    var f = pyio.open("backend/mojo_src/tests/fixtures/" + name, "r", encoding="utf-8")
+    var f = pyio.open("backend/src/tests/fixtures/" + name, "r", encoding="utf-8")
     var content = String(f.read())
     f.close()
     return content

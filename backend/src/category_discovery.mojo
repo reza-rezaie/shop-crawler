@@ -35,8 +35,8 @@
 # a confirmed 404 but also can't have a known product-presence signal.
 
 from std.python import Python, PythonObject
-from http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
-from browser_client import render_fetch
+from core.http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
+from core.browser_client import render_fetch
 from html_extract import (
     extract_json_ld_products,
     extract_heuristic_products,
@@ -44,8 +44,8 @@ from html_extract import (
     looks_like_client_rendered_app,
     find_next_page_url,
 )
-from textutil import is_child_path, find_all_anchor_hrefs_with_text, extract_host, url_path
-from db import upsert_site_category
+from core.text_utils import is_child_path, find_all_anchor_hrefs_with_text, extract_host, url_path
+from core.database import upsert_site_category
 
 comptime MAX_DISCOVERY_PAGES_DEFAULT = 25
 comptime MAX_DISCOVERY_PAGES_HARD_CAP = 200

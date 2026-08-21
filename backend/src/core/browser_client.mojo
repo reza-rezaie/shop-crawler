@@ -12,7 +12,7 @@
 # acceptable simplicity/POC trade-off).
 
 from std.python import Python, PythonObject
-from http_client import FetchResult
+from core.http_client import FetchResult
 
 comptime NAVIGATION_TIMEOUT_MS = 30000
 comptime RENDER_SETTLE_MS = 3000

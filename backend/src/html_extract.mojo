@@ -15,10 +15,10 @@
 # (via textutil.clean_text) for cleaning extracted text.
 
 from std.python import Python, PythonObject
-from models import Product
+from core.models import Product
 from pricing import parse_price
-from http_client import resolve_url
-from textutil import (
+from core.http_client import resolve_url
+from core.text_utils import (
     extract_attr,
     extract_blocks_by_class_hint,
     extract_first_tag_block,

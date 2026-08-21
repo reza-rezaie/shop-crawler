@@ -7,7 +7,7 @@
 from std.python import Python, PythonObject
 from std.python.bindings import PythonModuleBuilder
 from std.os import abort
-from db import (
+from core.database import (
     connect,
     count_products,
     query_products,
@@ -17,7 +17,7 @@ from db import (
     upsert_product,
     upsert_site_category,
 )
-from models import Product
+from core.models import Product
 from crawler import crawl as run_crawl
 from category_discovery import discover_categories as run_discover_categories
 

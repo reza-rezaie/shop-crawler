@@ -15,9 +15,9 @@
 # linear pagination-only walk.
 
 from std.python import Python, PythonObject
-from models import Product
-from http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
-from browser_client import render_fetch
+from core.models import Product
+from core.http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
+from core.browser_client import render_fetch
 from html_extract import (
     extract_json_ld_products,
     extract_heuristic_products,
@@ -29,7 +29,7 @@ from html_extract import (
     looks_like_not_found_page,
     find_child_links,
 )
-from db import upsert_product
+from core.database import upsert_product
 
 comptime MAX_PAGES_DEFAULT = 3
 comptime MAX_PAGES_HARD_CAP = 500
