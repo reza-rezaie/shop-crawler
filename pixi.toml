@@ -23,6 +23,11 @@ dev = "bash scripts/dev_server.sh"
 crawl = "bash scripts/pg_local.sh ensure && python backend/server.py --crawl-once"
 # Native-Mojo test suite (see backend/src/tests/).
 test = "bash scripts/pg_local.sh ensure && bash scripts/run_tests.sh"
+# Everything the GitHub Actions CI workflow runs (native-Mojo tests,
+# frontend lint, frontend build) -- run this locally before pushing to
+# catch what CI would catch. `npm ci` (not `npm install`, see
+# frontend-install below) for reproducible, lockfile-exact installs.
+ci = "pixi run test && cd frontend && npm ci && npm run lint && npm run build"
 # One-time setup: downloads the Chromium binary Playwright needs for the
 # JS-rendering crawl fallback (browser_client.mojo). Not a Conda package,
 # so it isn't pulled in by `pixi install` -- run this once per environment.
