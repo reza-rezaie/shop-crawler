@@ -3,12 +3,12 @@
 # -- added so a catalog spanning multiple crawled sites can be told apart
 # in the browse view (see openspec/changes/fix-product-extraction-and-browsing/).
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_database.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/core/test_database.mojo
 # Needs the pixi-managed local Postgres instance running (`pixi run test`
 # starts it automatically; see scripts/pg_local.sh).
 
 from std.python import Python
-from testing import check
+from tests.testing import check
 from core.database import (
     connect,
     upsert_product,

@@ -6,10 +6,10 @@
 # HTML, plus the two small robustness additions this change made (ng-src
 # image fallback, div-wrapped price).
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_js_rendered_extraction.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/modules/product_extraction/test_js_rendered_extraction.mojo
 
 from std.python import Python
-from testing import check
+from tests.testing import check
 from modules.product_extraction.extraction import extract_heuristic_products, extract_breadcrumb_category
 from core.text_utils import extract_attr, extract_first_void_tag
 

@@ -178,23 +178,38 @@
 
 ## 8. Finish `api.mojo`, tests layout, and repo-wide path/naming sweep
 
-- [ ] 8.1 Confirm `api.mojo` now contains only `PyInit_api` wiring plus
+- [x] 8.1 Confirm `api.mojo` now contains only `PyInit_api` wiring plus
       `health`, `migrate_products`, `migrate_site_categories` (Decision 7)
-      — no module business logic left inline.
-- [ ] 8.2 Reorganize `backend/src/tests/` into `tests/core/` and
+      — no module business logic left inline. Confirmed by re-reading the
+      file in group 7.
+- [x] 8.2 Reorganize `backend/src/tests/` into `tests/core/` and
       `tests/modules/<name>/` mirroring `backend/src/core/` and
       `backend/src/modules/*` (keep `testing.mojo` and `fixtures/` shared
-      at the top of `tests/`).
-- [ ] 8.3 Update `scripts/run_tests.sh`'s test-file glob if the
+      at the top of `tests/`). Spiked first (same-directory sibling
+      import risk for `from testing import check` once test files nest,
+      plus a `tests/core/` vs `backend/src/core/` name collision risk) —
+      confirmed Mojo does true dotted-path resolution, no collision, then
+      did the real move: `tests/__init__.mojo`, `tests/core/__init__.mojo`
+      + 5 files, `tests/modules/__init__.mojo` +
+      `tests/modules/category_discovery/__init__.mojo` +
+      `tests/modules/product_extraction/__init__.mojo` + 2 files. Every
+      moved file's `from testing import check` → `from tests.testing
+      import check`, plus its own `Run with:` comment path.
+      `product_browsing` has no dedicated test file, so no test
+      subdirectory was created for it.
+- [x] 8.3 Update `scripts/run_tests.sh`'s test-file glob if the
       reorganization in 8.2 changes how `test_*.mojo` files are
       discovered (e.g. switch to a recursive find if tests now live in
-      subdirectories).
-- [ ] 8.4 `grep -rn 'mojo_src\|core\.db\b\|core\.textutil\b'
+      subdirectories). Switched the flat glob to `find backend/src/tests
+      -name 'test_*.mojo' | sort`.
+- [x] 8.4 `grep -rn 'mojo_src\|core\.db\b\|core\.textutil\b'
       --include='*.toml' --include='*.sh' --include='*.py'
       --include='*.md'` across the repo (pixi.toml, scripts/,
       backend/server.py, README.md, SPEC.md) and update any leftover path
       or naming reference broken by the moves/renames.
-- [ ] 8.5 Run `pixi run test` (full suite) one final time.
+- [x] 8.5 Run `pixi run test` (full suite) one final time. Passed,
+      108/108 assertions across all 7 test files (now discovered
+      recursively), 0 errors.
 - [ ] 8.6 Manual smoke check: `pixi run serve`, then crawl
       `https://books.toscrape.com/` from the UI (or `pixi run crawl --
       https://books.toscrape.com/`) and confirm products are
@@ -202,6 +217,10 @@
       discovery run still populates `site_categories` — matching
       pre-refactor behavior with no code-level comparison needed since
       the DB/HTTP contract didn't change.
-- [ ] 8.7 Update `SPEC.md` §1 (architecture diagram / file list) and
+- [x] 8.7 Update `SPEC.md` §1 (architecture diagram / file list) and
       `README.md`'s directory listing to reflect the new `backend/src/`
       layout (including the `modules/` grouping and renamed files).
+      SPEC.md §5 got a full rewrite (module tree + rationale); §7's
+      historical build-log references to `mojo_src/...` paths were
+      deliberately left as-is (they document what was true when written,
+      like the archived openspec changes).

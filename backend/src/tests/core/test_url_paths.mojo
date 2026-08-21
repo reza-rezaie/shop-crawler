@@ -4,9 +4,9 @@
 # parent/child/sibling/unrelated URL examples found live on
 # azurestandard.com's own category tree.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_url_paths.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/core/test_url_paths.mojo
 
-from testing import check
+from tests.testing import check
 from core.text_utils import url_path, url_path_stem, is_child_path, find_all_anchor_hrefs
 
 

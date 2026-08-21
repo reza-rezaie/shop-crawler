@@ -4,10 +4,10 @@
 # crawler.mojo's own crawl() loop) and is verified manually instead -- see
 # openspec/changes/add-category-discovery-crawl/tasks.md ss6.2/6.3.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_category_discovery.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/modules/category_discovery/test_category_discovery.mojo
 
 from std.python import Python
-from testing import check
+from tests.testing import check
 from modules.category_discovery.discovery import (
     decide_discovery_page,
     name_from_url,

@@ -5,10 +5,10 @@
 # mistaken for a real product card. See openspec/changes/
 # fix-product-extraction-and-browsing/ for the full writeup.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_text_utils.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/core/test_text_utils.mojo
 
 from std.python import Python
-from testing import check
+from tests.testing import check
 from core.text_utils import (
     class_hint_matches,
     is_valid_class_token,

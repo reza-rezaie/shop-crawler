@@ -5,10 +5,10 @@
 # category-tree structure underneath its working category pages. See
 # openspec/changes/archive/...-add-category-drill-down-crawling/.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_category_drill_down.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/core/test_category_drill_down.mojo
 
 from std.python import Python
-from testing import check
+from tests.testing import check
 from core.page_signals import looks_like_not_found_page, find_child_links
 
 

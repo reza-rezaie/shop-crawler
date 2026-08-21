@@ -2,10 +2,10 @@
 # the azurestandard.com bug fix: a client-rendered page that yields zero
 # products should say so explicitly instead of failing silently.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_page_signals.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/core/test_page_signals.mojo
 
 from std.python import Python
-from testing import check
+from tests.testing import check
 from core.page_signals import looks_like_client_rendered_app
 
 

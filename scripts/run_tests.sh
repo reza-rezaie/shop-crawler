@@ -6,12 +6,12 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 status=0
-for test_file in backend/src/tests/test_*.mojo; do
+while IFS= read -r -d '' test_file; do
     echo "=== $test_file ==="
     if ! mojo run -I backend/src "$test_file"; then
         status=1
     fi
     echo
-done
+done < <(find backend/src/tests -name 'test_*.mojo' -print0 | sort -z)
 
 exit $status
