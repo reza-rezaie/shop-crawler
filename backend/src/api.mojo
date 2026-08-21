@@ -19,7 +19,7 @@ from core.database import (
 )
 from core.models import Product
 from modules.product_extraction.crawler import crawl as run_crawl
-from category_discovery import discover_categories as run_discover_categories
+from modules.category_discovery.discovery import discover_categories as run_discover_categories
 
 comptime DEFAULT_MAX_PAGES = 3
 comptime DEFAULT_MAX_DETAIL_FETCHES = 60

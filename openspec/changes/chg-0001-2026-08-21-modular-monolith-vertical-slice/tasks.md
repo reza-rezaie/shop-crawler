@@ -125,18 +125,24 @@
 
 ## 6. Relocate `category_discovery` module
 
-- [ ] 6.1 Create `backend/src/modules/category_discovery/__init__.mojo`.
-- [ ] 6.2 Move `category_discovery.mojo` into
+- [x] 6.1 Create `backend/src/modules/category_discovery/__init__.mojo`.
+- [x] 6.2 Move `category_discovery.mojo` into
       `modules/category_discovery/discovery.mojo`; update its imports
       (`core.*`, `modules.product_extraction.extraction` for the
-      product-specific functions it uses).
-- [ ] 6.3 Update `api.mojo`'s `from category_discovery import
+      product-specific functions it uses). Already pointed at those from
+      group 4 — the move itself needed no import changes; also fixed two
+      stale `textutil.` comment references predating this session while
+      touching the file.
+- [x] 6.3 Update `api.mojo`'s `from category_discovery import
       discover_categories as run_discover_categories` to `from
       modules.category_discovery.discovery import discover_categories as
       run_discover_categories`.
-- [ ] 6.4 Update `backend/src/tests/test_category_discovery.mojo` and
+- [x] 6.4 Update `backend/src/tests/test_category_discovery.mojo` and
       `test_category_drill_down.mojo` imports.
-- [ ] 6.5 Run `pixi run test`; fix any breakage before continuing.
+      `test_category_drill_down.mojo` had no `category_discovery` import
+      (only `core.page_signals`, from group 4) — nothing to change there.
+- [x] 6.5 Run `pixi run test`; fix any breakage before continuing. Full
+      suite passed, 108/108 assertions, 0 errors.
 
 ## 7. Extract `product_browsing` module + `core/request.mojo` (Decisions 6, 8)
 

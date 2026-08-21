@@ -4,7 +4,7 @@
 # none", "is this actually a 404 rather than a legitimately-empty page",
 # and "what same-host child links does this page have". None of these are
 # product-extraction logic -- crawler.mojo (product_extraction) and
-# category_discovery.mojo both need them to decide what a fetched page
+# category_discovery's discovery.mojo both need them to decide what a fetched page
 # means, which is why they live in core/ rather than under
 # modules/product_extraction/. Split out of the former html_extract.mojo
 # -- see openspec/changes/chg-0001-2026-08-21-modular-monolith-vertical-slice/

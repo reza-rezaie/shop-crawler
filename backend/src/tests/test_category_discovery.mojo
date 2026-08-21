@@ -1,4 +1,4 @@
-# Tests for category_discovery.mojo's pure per-page decision logic
+# Tests for modules/category_discovery/discovery.mojo's pure per-page decision logic
 # (decide_discovery_page, name_from_url, pending_after_budget). The full
 # discover_categories BFS loop does live network fetches (like
 # crawler.mojo's own crawl() loop) and is verified manually instead -- see
@@ -8,7 +8,7 @@
 
 from std.python import Python
 from testing import check
-from category_discovery import (
+from modules.category_discovery.discovery import (
     decide_discovery_page,
     name_from_url,
     pending_after_budget,
