@@ -35,4 +35,4 @@ context: |
   - New OpenSpec changes should use: CRW-NNNN-YYYY-MM-DD-short-description
   - NNNN is a zero-padded sequential number.
   - Example: CRW-0007-2026-08-10-add-sso.
-  - Before creating a new change, inspect openspec/changes and use the next available number. If ther eis no number start with
+  - Before creating a new change, inspect openspec/changes and use the next available number. If there is no number yet, start with 0001.
