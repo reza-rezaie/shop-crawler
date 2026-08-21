@@ -146,25 +146,35 @@
 
 ## 7. Extract `product_browsing` module + `core/request.mojo` (Decisions 6, 8)
 
-- [ ] 7.1 Create `backend/src/core/request.mojo` containing `_get_str`,
+- [x] 7.1 Create `backend/src/core/request.mojo` containing `_get_str`,
       `_get_int`, `_get_bool`, `_get_obj`, `_get_optional_float` (moved
       verbatim from `api.mojo`, made non-private if needed for cross-module
-      use).
-- [ ] 7.2 Create `backend/src/modules/product_browsing/__init__.mojo` and
+      use). Renamed without the leading underscore (`get_str` etc.) since
+      they're now genuinely cross-module.
+- [x] 7.2 Create `backend/src/modules/product_browsing/__init__.mojo` and
       `modules/product_browsing/browsing.mojo` containing the
       request-handling logic currently inline in `api.mojo`'s
       `list_products`, `categories`, `sources`, `site_categories`
       functions (parsing params via `core.request`, calling
       `core.database`'s
       `query_products`/`list_categories`/`list_sources`/`list_site_categories`).
-- [ ] 7.3 Update `api.mojo`'s `PyInit_api` registrations for
+      Each function takes an already-connected `conn`, matching the
+      established pattern `crawler.crawl`/`discovery.discover_categories`
+      already use (api.mojo still owns the `connect()` call per request).
+- [x] 7.3 Update `api.mojo`'s `PyInit_api` registrations for
       `list_products`, `categories`, `sources`, `site_categories` to point
       at the new `modules.product_browsing.browsing` functions; remove the
       old inline bodies.
-- [ ] 7.4 Update `crawl` and `discover_categories` handlers in `api.mojo`
+- [x] 7.4 Update `crawl` and `discover_categories` handlers in `api.mojo`
       to use `core.request`'s helpers instead of the local private ones
       removed in 7.1.
-- [ ] 7.5 Run `pixi run test`; fix any breakage before continuing.
+- [x] 7.5 Run `pixi run test`; fix any breakage before continuing. Full
+      unit suite passed, 108/108 assertions, 0 errors. Also directly
+      verified `api.mojo` itself (not covered by any test_*.mojo file)
+      still compiles as a Python extension module with all 9 functions
+      exported (`python3 -c "import mojo.importer; import api"` inside
+      the pixi env) — this file is the highest-risk one in this whole
+      migration and isn't exercised by the unit-test loop.
 
 ## 8. Finish `api.mojo`, tests layout, and repo-wide path/naming sweep
 
