@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MOJO_SRC_DIR = PROJECT_ROOT / "backend" / "mojo_src"
+MOJO_SRC_DIR = PROJECT_ROOT / "backend" / "src"
 SQLITE_PATH = PROJECT_ROOT / "data" / "products.db"
 DB_NAME = os.environ.get("PGDATABASE", "products")
 

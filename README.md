@@ -13,7 +13,9 @@ pixi.toml            # Mojo + task definitions (third-party Python deps: playwri
 scripts/activate.sh   # pixi activation hook (see "Gotcha" below)
 scripts/pg_local.sh    # manages the pixi-local Postgres instance (init/start/stop)
 backend/
-  mojo_src/            # native Mojo: crawler, HTML extraction, pricing, Postgres, API
+  src/                 # native Mojo, modular monolith (see SPEC.md ss5):
+    modules/            #   product_extraction/, category_discovery/, product_browsing/
+    core/                #   shared kernel: database, http_client, text_utils, ...
   server.py             # thin Python HTTP shim + static file server
 frontend/              # React (Vite) UI
 data/products.db       # old SQLite database, kept only as a pre-migration backup
@@ -99,7 +101,7 @@ pixi run test
 ```
 
 Starts the local Postgres instance (if not already running), then runs the
-native-Mojo test suite under `backend/mojo_src/tests/` (string/HTML
+native-Mojo test suite under `backend/src/tests/` (string/HTML
 extraction correctness, SPA-shell detection, JS-rendered-DOM extraction,
 Postgres storage/filtering — see `openspec/specs/` and
 `openspec/changes/archive/` for what prompted several of these).

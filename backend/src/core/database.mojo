@@ -4,9 +4,9 @@
 # driver either, same reason it had none for SQLite).
 
 from std.python import Python, PythonObject
-from models import Product
-from http_client import now_iso
-from textutil import extract_host
+from core.models import Product
+from core.http_client import now_iso
+from core.text_utils import extract_host
 
 comptime SCHEMA = """
 CREATE TABLE IF NOT EXISTS products (

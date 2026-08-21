@@ -1,14 +1,14 @@
-# Tests for category_discovery.mojo's pure per-page decision logic
+# Tests for modules/category_discovery/discovery.mojo's pure per-page decision logic
 # (decide_discovery_page, name_from_url, pending_after_budget). The full
 # discover_categories BFS loop does live network fetches (like
 # crawler.mojo's own crawl() loop) and is verified manually instead -- see
 # openspec/changes/add-category-discovery-crawl/tasks.md ss6.2/6.3.
 #
-# Run with: pixi run mojo run -I backend/mojo_src backend/mojo_src/tests/test_category_discovery.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/modules/category_discovery/test_category_discovery.mojo
 
 from std.python import Python
-from testing import check
-from category_discovery import (
+from tests.testing import check
+from modules.category_discovery.discovery import (
     decide_discovery_page,
     name_from_url,
     pending_after_budget,
@@ -19,7 +19,7 @@ from category_discovery import (
 
 def _read_fixture(name: String) raises -> String:
     var pyio = Python.import_module("builtins")
-    var f = pyio.open("backend/mojo_src/tests/fixtures/" + name, "r", encoding="utf-8")
+    var f = pyio.open("backend/src/tests/fixtures/" + name, "r", encoding="utf-8")
     var content = String(f.read())
     f.close()
     return content
