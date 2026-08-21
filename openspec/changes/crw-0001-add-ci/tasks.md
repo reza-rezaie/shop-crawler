@@ -15,13 +15,16 @@
       caching enabled), `actions/setup-node` (version matching
       `frontend/package.json` engine expectations, or latest LTS if
       unspecified), then run `pixi run ci`.
-- [ ] 2.3 Push the workflow on a throwaway branch/PR and confirm
+- [x] 2.3 Push the workflow on a throwaway branch/PR and confirm
       `pixi install` succeeds on the hosted runner (validates the
       `conda.modular.com/max` reachability risk from design.md). If it
       fails on authentication, add the required token/secret and re-run
       before continuing.
-- [ ] 2.4 Confirm the workflow goes green end-to-end (tests, lint, build)
+      → Confirmed on PR #8: `pixi install` succeeded anonymously, no
+      token/secret needed.
+- [x] 2.4 Confirm the workflow goes green end-to-end (tests, lint, build)
       on that throwaway PR.
+      → PR #8, run 32534272193: passed in 1m3s (`gh pr checks 8`).
 
 ## 3. Branch protection
 
@@ -37,6 +40,7 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Open a real pull request for this change itself and confirm the
+- [x] 5.1 Open a real pull request for this change itself and confirm the
       new workflow runs and reports status on it, satisfying the specs in
       `specs/ci/spec.md`.
+      → https://github.com/reza-rezaie/shop-crawler/pull/8
