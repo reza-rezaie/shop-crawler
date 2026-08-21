@@ -210,13 +210,22 @@
 - [x] 8.5 Run `pixi run test` (full suite) one final time. Passed,
       108/108 assertions across all 7 test files (now discovered
       recursively), 0 errors.
-- [ ] 8.6 Manual smoke check: `pixi run serve`, then crawl
+- [x] 8.6 Manual smoke check: `pixi run serve`, then crawl
       `https://books.toscrape.com/` from the UI (or `pixi run crawl --
       https://books.toscrape.com/`) and confirm products are
       created/updated, browsing/filtering still works, and a category
       discovery run still populates `site_categories` — matching
       pre-refactor behavior with no code-level comparison needed since
-      the DB/HTTP contract didn't change.
+      the DB/HTTP contract didn't change. Ran the real server
+      (`PORT=8123 pixi run serve`) and exercised every endpoint live:
+      `/api/health` (601 pre-existing products), `/api/crawl` against
+      books.toscrape.com's mystery category (20 products
+      found/created — product_extraction), `/api/products` +
+      `/api/categories` + `/api/sources` (product_browsing),
+      `/api/site-categories/discover` + `/api/site-categories`
+      (category_discovery — 1 category found and listed). All four
+      endpoint groups round-tripped through the new module structure
+      correctly end-to-end.
 - [x] 8.7 Update `SPEC.md` §1 (architecture diagram / file list) and
       `README.md`'s directory listing to reflect the new `backend/src/`
       layout (including the `modules/` grouping and renamed files).
