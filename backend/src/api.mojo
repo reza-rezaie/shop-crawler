@@ -18,7 +18,7 @@ from core.database import (
     upsert_site_category,
 )
 from core.models import Product
-from crawler import crawl as run_crawl
+from modules.product_extraction.crawler import crawl as run_crawl
 from category_discovery import discover_categories as run_discover_categories
 
 comptime DEFAULT_MAX_PAGES = 3

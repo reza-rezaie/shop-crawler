@@ -101,20 +101,27 @@
 
 ## 5. Relocate `product_extraction` module
 
-- [ ] 5.1 Create `backend/src/modules/__init__.mojo` and
-      `backend/src/modules/product_extraction/__init__.mojo`.
-- [ ] 5.2 Move `pricing.mojo` into
-      `modules/product_extraction/pricing.mojo`.
-- [ ] 5.3 Move `crawler.mojo` into `modules/product_extraction/crawler.mojo`;
+- [x] 5.1 Create `backend/src/modules/__init__.mojo` and
+      `backend/src/modules/product_extraction/__init__.mojo`. Done early
+      in group 4 (task 4.2) since `extraction.mojo` needed a home then.
+- [x] 5.2 Move `pricing.mojo` into
+      `modules/product_extraction/pricing.mojo`. Done early in group 4
+      (task 4.2) since `extraction.mojo` imports it.
+- [x] 5.3 Move `crawler.mojo` into `modules/product_extraction/crawler.mojo`;
       update its imports (`core.*`,
       `modules.product_extraction.extraction`,
       `modules.product_extraction.pricing` via `extraction.mojo`'s own
-      import).
-- [ ] 5.4 Update `api.mojo`'s `from crawler import crawl as run_crawl` to
+      import). crawler.mojo's own imports already pointed at `core.*`/
+      `modules.product_extraction.extraction` from group 4, so the move
+      itself needed no import changes.
+- [x] 5.4 Update `api.mojo`'s `from crawler import crawl as run_crawl` to
       `from modules.product_extraction.crawler import crawl as run_crawl`.
-- [ ] 5.5 Move/update `backend/src/tests/test_js_rendered_extraction.mojo`
-      and any other crawler-focused test file's imports.
-- [ ] 5.6 Run `pixi run test`; fix any breakage before continuing.
+- [x] 5.5 Move/update `backend/src/tests/test_js_rendered_extraction.mojo`
+      and any other crawler-focused test file's imports. No test imports
+      `crawler.mojo` directly (it tests the extraction functions, already
+      repointed in group 4) — confirmed via grep, nothing to change.
+- [x] 5.6 Run `pixi run test`; fix any breakage before continuing. Full
+      suite passed, 108/108 assertions, 0 errors.
 
 ## 6. Relocate `category_discovery` module
 
