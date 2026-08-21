@@ -32,7 +32,7 @@ schema: spec-driven
 #         - Summarize the archive outcome before finishing
 context: |
   Change naming convention:
-  - New OpenSpec changes should use: chg-NNNN-short-description
+  - New OpenSpec changes should use: CRW-NNNN-YYYY-MM-DD-short-description
   - NNNN is a zero-padded sequential number.
-  - Example: chg-0007-add-sso.
-  - Before creating a new change, inspect openspec/changes and use the next available number. If ther eis no number start with 001
+  - Example: CRW-0007-2026-08-10-add-sso.
+  - Before creating a new change, inspect openspec/changes and use the next available number. If ther eis no number start with
