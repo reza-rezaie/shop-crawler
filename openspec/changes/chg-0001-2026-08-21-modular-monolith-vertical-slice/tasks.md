@@ -66,25 +66,38 @@
 
 ## 4. Split `html_extract.mojo` (Decision 4)
 
-- [ ] 4.1 Create `backend/src/core/page_signals.mojo` containing
+- [x] 4.1 Create `backend/src/core/page_signals.mojo` containing
       `looks_like_client_rendered_app`, `looks_like_not_found_page`,
       `find_next_page_url`, `find_child_links`, `_spa_shell_markers`
       (moved verbatim, imports updated to `core.` paths).
-- [ ] 4.2 Rename the remainder of `html_extract.mojo` to
-      `backend/src/modules/product_extraction/extraction.mojo` (directory
-      created in task 5.1, or created here if task ordering is swapped):
-      `extract_json_ld_products`, `extract_heuristic_products`,
+- [x] 4.2 Rename the remainder of `html_extract.mojo` to
+      `backend/src/modules/product_extraction/extraction.mojo` (created
+      `modules/__init__.mojo` and `modules/product_extraction/__init__.mojo`
+      early, pulled forward from task 5.1, since extraction.mojo needed a
+      home): `extract_json_ld_products`, `extract_heuristic_products`,
       `extract_breadcrumb_category`, `extract_last_breadcrumb_items`,
       `extract_product_description`, `_collect_products_from_jsonld`,
-      `_product_from_block`, `_find_price_text`, `_candidate_tags`.
-- [ ] 4.3 Update `crawler.mojo` and `category_discovery.mojo` imports to
+      `_product_from_block`, `_find_price_text`, `_candidate_tags`. Also
+      moved `pricing.mojo` → `modules/product_extraction/pricing.mojo`
+      (pulled forward from 5.2) since extraction.mojo imports it.
+- [x] 4.3 Update `crawler.mojo` and `category_discovery.mojo` imports to
       pull page-signal functions from `core.page_signals` and
       product-extraction functions from
-      `modules.product_extraction.extraction`.
-- [ ] 4.4 Split `backend/src/tests/test_html_extract.mojo` into the tests
+      `modules.product_extraction.extraction`. Also fixed stale
+      `textutil.`/`html_extract.` prose references in both files' own
+      comments (predating this session's renames) while touching them.
+- [x] 4.4 Split `backend/src/tests/test_html_extract.mojo` into the tests
       that belong with each half (or duplicate the file temporarily and
-      prune) so assertions still map 1:1 to the functions they test.
-- [ ] 4.5 Run `pixi run test`; fix any breakage before continuing.
+      prune) so assertions still map 1:1 to the functions they test. Its
+      one test (`looks_like_client_rendered_app`) is 100% page_signals
+      content, so renamed the whole file to `test_page_signals.mojo`
+      rather than splitting; also renamed `test_textutil.mojo` →
+      `test_text_utils.mojo` and `test_db.mojo` → `test_database.mojo` to
+      track their renamed modules, and repointed
+      `test_js_rendered_extraction.mojo`/`test_category_drill_down.mojo`
+      imports to their functions' new homes.
+- [x] 4.5 Run `pixi run test`; fix any breakage before continuing. Full
+      suite passed, 108/108 assertions, 0 errors.
 
 ## 5. Relocate `product_extraction` module
 

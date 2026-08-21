@@ -1,6 +1,6 @@
 # Native Mojo category-discovery crawl: walk a site's category-hub
 # structure (the same same-host, path-nested "child link" heuristic
-# product-extraction's drill-down uses -- see textutil.is_child_path) and
+# product-extraction's drill-down uses -- see core.text_utils.is_child_path) and
 # persist it as a tree, independent of and cheaper than a product crawl.
 # No product extraction that persists product rows, and no detail-page
 # description fetches: the only extraction work done here is a throwaway
@@ -19,7 +19,7 @@
 #
 # The per-page decision logic (decide_discovery_page) and the
 # budget-cutoff bookkeeping (pending_after_budget) are pulled out as
-# plain, no-I/O functions -- like html_extract.find_child_links is a pure
+# plain, no-I/O functions -- like core.page_signals.find_child_links is a pure
 # piece crawler.mojo's own fetch loop calls -- so they're unit-testable
 # without a live network fetch, which discover_categories' actual queue
 # loop below necessarily needs (same reason crawler.mojo's own loop has
@@ -37,12 +37,14 @@
 from std.python import Python, PythonObject
 from core.http_client import fetch, can_fetch, resolve_url, rate_limit_sleep
 from core.browser_client import render_fetch
-from html_extract import (
-    extract_json_ld_products,
-    extract_heuristic_products,
+from core.page_signals import (
     looks_like_not_found_page,
     looks_like_client_rendered_app,
     find_next_page_url,
+)
+from modules.product_extraction.extraction import (
+    extract_json_ld_products,
+    extract_heuristic_products,
 )
 from core.text_utils import is_child_path, find_all_anchor_hrefs_with_text, extract_host, url_path
 from core.database import upsert_site_category
@@ -102,7 +104,7 @@ def name_from_url(url: String) raises -> String:
 def _strip_fragment(url: String) raises -> String:
     """Drop a trailing `#fragment` -- it never causes a different page
     load (is_child_path's own path comparison already ignores it, via
-    textutil.url_path), so a same-page anchor link like `...#reviews`
+    core.text_utils.url_path), so a same-page anchor link like `...#reviews`
     must not be recorded as a distinct child category node from the
     plain page it points at."""
     var idx = url.find("#")

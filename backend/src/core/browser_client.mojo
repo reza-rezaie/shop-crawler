@@ -1,6 +1,6 @@
 # The one file in this project with Playwright interop -- a JS-rendering
 # fallback for pages whose product listing doesn't exist in the raw fetched
-# HTML at all (client-rendered SPAs; see html_extract.looks_like_client_
+# HTML at all (client-rendered SPAs; see core.page_signals.looks_like_client_
 # rendered_app). Every other file keeps working with plain FetchResult
 # values (the same struct http_client.fetch returns) and doesn't need to
 # know whether a page's HTML came from urllib or a rendered browser.

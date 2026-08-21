@@ -10,7 +10,7 @@
 
 from std.python import Python
 from testing import check
-from html_extract import extract_heuristic_products, extract_breadcrumb_category
+from modules.product_extraction.extraction import extract_heuristic_products, extract_breadcrumb_category
 from core.text_utils import extract_attr, extract_first_void_tag
 
 

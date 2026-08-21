@@ -1,11 +1,11 @@
-# Unit-style tests for textutil.mojo's class-hint matching and attribute
+# Unit-style tests for text_utils.mojo's class-hint matching and attribute
 # lookup, covering the azurestandard.com bug: a heuristic product-card
 # matcher that treated any substring of a `class` attribute as a match,
 # so a JS-framework binding expression containing the word "product" was
 # mistaken for a real product card. See openspec/changes/
 # fix-product-extraction-and-browsing/ for the full writeup.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_textutil.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/test_text_utils.mojo
 
 from std.python import Python
 from testing import check
@@ -117,4 +117,4 @@ def main() raises:
     test_azurestandard_fixture_no_false_positive()
     test_books_toscrape_fixture_still_matches()
     test_find_all_anchor_hrefs_with_text()
-    print("All textutil tests passed.")
+    print("All text_utils tests passed.")

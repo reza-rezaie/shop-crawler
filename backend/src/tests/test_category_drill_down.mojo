@@ -9,7 +9,7 @@
 
 from std.python import Python
 from testing import check
-from html_extract import looks_like_not_found_page, find_child_links
+from core.page_signals import looks_like_not_found_page, find_child_links
 
 
 def _read_fixture(name: String) raises -> String:

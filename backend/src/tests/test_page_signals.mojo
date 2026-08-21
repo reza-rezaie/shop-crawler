@@ -1,12 +1,12 @@
-# Tests for html_extract.mojo's SPA-shell detection, added alongside the
-# azurestandard.com bug fix: a client-rendered page that yields zero
+# Tests for core/page_signals.mojo's SPA-shell detection, added alongside
+# the azurestandard.com bug fix: a client-rendered page that yields zero
 # products should say so explicitly instead of failing silently.
 #
-# Run with: pixi run mojo run -I backend/src backend/src/tests/test_html_extract.mojo
+# Run with: pixi run mojo run -I backend/src backend/src/tests/test_page_signals.mojo
 
 from std.python import Python
 from testing import check
-from html_extract import looks_like_client_rendered_app
+from core.page_signals import looks_like_client_rendered_app
 
 
 def _read_fixture(name: String) raises -> String:
@@ -37,4 +37,4 @@ def test_spa_shell_detection() raises:
 
 def main() raises:
     test_spa_shell_detection()
-    print("All html_extract tests passed.")
+    print("All page_signals tests passed.")
