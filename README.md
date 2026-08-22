@@ -46,6 +46,12 @@ Then open **http://localhost:8000**. If port 8000 is already taken on your
 machine, run `PORT=8010 pixi run serve` instead (or `pixi run python
 backend/server.py --port 8010`).
 
+Or, after the one-time `playwright-install` above, skip straight to `pixi
+run dev` — it builds the frontend for you if it isn't built yet, starts
+Postgres, and serves on a fixed, unusual port (8934, to avoid clashing with
+whatever else you have running) so you don't need the `frontend-build`/
+`serve` steps separately. Override the port with `PORT=8935 pixi run dev`.
+
 Already have data in the old `data/products.db` from before this project
 used Postgres? Run `pixi run db-migrate` once to copy it over — see
 `scripts/migrate_sqlite_to_postgres.py`. The old file is left in place
