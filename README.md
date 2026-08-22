@@ -117,6 +117,13 @@ runs on every push/PR to `main` — the native-Mojo test suite, the frontend
 lint (`oxlint`), and the frontend build — so you can catch a failure
 locally before pushing. Pull requests are gated on that workflow passing.
 
+### Changelog
+
+Notable changes are tracked in [CHANGELOG.md](CHANGELOG.md), most recent
+first. A PR that changes user-visible or observable behavior should add
+its own entry there, in that same PR — not as a follow-up afterward
+(purely internal PRs like refactors/tooling don't need one).
+
 ## Notes / POC limitations
 
 - The crawl endpoint runs synchronously and is capped (default 3 pages,
