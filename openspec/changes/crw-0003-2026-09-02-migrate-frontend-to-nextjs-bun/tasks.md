@@ -210,11 +210,15 @@
       services in this env, so Next used 3001 and the forward landed on
       a foreign :8000 service rather than our Mojo backend — the proxy
       *mechanism* is what this task verifies and it works.
-- [ ] 6.5 Open a real PR for this change; confirm CI runs and passes
+- [x] 6.5 Open a real PR for this change; confirm CI runs and passes
       without any Node provisioning step ("CI builds the frontend
       without a Node provisioning step").
-      → NOT done. Needs the user to push + open the PR. Also blocked by
-      a config gap: `.github/workflows/ci.yml` triggers only on
-      `branches: [main]`, but the project rule is now to PR into
-      `develop` — a PR to `develop` won't run CI until the triggers
-      include it. Local `pixi run ci` is green (4.4).
+      → Done. PR #11 (base `develop`). Fixed the config gap first:
+      `.github/workflows/ci.yml` now triggers on `[main, develop]`.
+      CI run 33702796844 passed in 1m14s — checkout → setup-pixi →
+      `pixi run ci` (Mojo tests + `bun install --frozen-lockfile` +
+      `bun run lint` + `bun run build`), no `setup-node` step.
+      Non-fatal annotations only: GitHub's Node 20 runner-deprecation
+      notice, the known `only-export-components` oxlint warning on
+      `layout.jsx`, and a runner cache 400 (save/restore) unrelated to
+      this change.
