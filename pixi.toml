@@ -25,9 +25,10 @@ crawl = "bash scripts/pg_local.sh ensure && python backend/server.py --crawl-onc
 test = "bash scripts/pg_local.sh ensure && bash scripts/run_tests.sh"
 # Everything the GitHub Actions CI workflow runs (native-Mojo tests,
 # frontend lint, frontend build) -- run this locally before pushing to
-# catch what CI would catch. `npm ci` (not `npm install`, see
-# frontend-install below) for reproducible, lockfile-exact installs.
-ci = "pixi run test && cd frontend && npm ci && npm run lint && npm run build"
+# catch what CI would catch. `bun install --frozen-lockfile` (not plain
+# `bun install`, see frontend-install below) for reproducible,
+# lockfile-exact installs that fail on drift.
+ci = "pixi run test && cd frontend && bun install --frozen-lockfile && bun run lint && bun run build"
 # One-time setup: downloads the Chromium binary Playwright needs for the
 # JS-rendering crawl fallback (browser_client.mojo). Not a Conda package,
 # so it isn't pulled in by `pixi install` -- run this once per environment.
@@ -39,10 +40,13 @@ pg-stop = "bash scripts/pg_local.sh stop"
 # One-time: copy data/products.db's existing rows into the Postgres catalog.
 # See scripts/migrate_sqlite_to_postgres.py.
 db-migrate = "bash scripts/pg_local.sh ensure && python scripts/migrate_sqlite_to_postgres.py"
-# Frontend dev/build helpers (Node/npm, used only for the React UI).
-frontend-install = { cmd = "npm install", cwd = "frontend" }
-frontend-build = { cmd = "npm run build", cwd = "frontend" }
-frontend-dev = { cmd = "npm run dev", cwd = "frontend" }
+# Frontend helpers (Bun, used only for the Next.js UI). `frontend-build`
+# produces the static export at frontend/out/ that backend/server.py
+# serves; `frontend-dev` runs the Next.js dev server (proxies /api to the
+# backend -- see frontend/next.config.js).
+frontend-install = { cmd = "bun install", cwd = "frontend" }
+frontend-build = { cmd = "bun run build", cwd = "frontend" }
+frontend-dev = { cmd = "bun run dev", cwd = "frontend" }
 
 [dependencies]
 # Native Mojo backend + crawler/business logic.
@@ -67,3 +71,9 @@ postgresql = ">=17,<18"
 # Everything else the backend uses via Mojo's Python interop is Python's
 # standard library (urllib, http.server, json, html) -- see SPEC.md for
 # the full breakdown of what's native Mojo vs. Python interop.
+#
+# Frontend toolchain: Bun is the package manager + runtime that builds the
+# Next.js UI (see openspec/changes/.../crw-0003). Pinned wide -- the static
+# export needs nothing bleeding-edge -- and provisioned here so there's no
+# separate Node.js/npm prerequisite to install by hand.
+bun = ">=1.1,<2"

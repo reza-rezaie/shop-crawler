@@ -8,8 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+# Next.js build output (static export) and build cache
+out
+.next
 *.local
 
 # Editor directories and files

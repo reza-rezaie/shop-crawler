@@ -19,12 +19,12 @@ if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
     exit 1
 fi
 
-if [ ! -f frontend/dist/index.html ]; then
+if [ ! -f frontend/out/index.html ]; then
     echo "No frontend build found -- building it first (one-time, or after frontend changes)..."
     if [ ! -d frontend/node_modules ]; then
-        npm install --prefix frontend
+        (cd frontend && bun install)
     fi
-    npm run build --prefix frontend
+    (cd frontend && bun run build)
     echo
 fi
 

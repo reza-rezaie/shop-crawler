@@ -9,7 +9,7 @@ packages (Playwright, for a JS-rendering crawl fallback — see below; and
 design and the exact Mojo/Python split.
 
 ```
-pixi.toml            # Mojo + task definitions (third-party Python deps: playwright-python, psycopg2)
+pixi.toml            # Mojo + Bun + task definitions (third-party Python deps: playwright-python, psycopg2)
 scripts/activate.sh   # pixi activation hook (see "Gotcha" below)
 scripts/pg_local.sh    # manages the pixi-local Postgres instance (init/start/stop)
 backend/
@@ -17,7 +17,7 @@ backend/
     modules/            #   product_extraction/, category_discovery/, product_browsing/
     core/                #   shared kernel: database, http_client, text_utils, ...
   server.py             # thin Python HTTP shim + static file server
-frontend/              # React (Vite) UI
+frontend/              # Next.js UI (React, App Router, static export; built with Bun)
 data/products.db       # old SQLite database, kept only as a pre-migration backup
 data/pgdata/            # pixi-managed local Postgres data directory (gitignored)
 ```
@@ -25,19 +25,19 @@ data/pgdata/            # pixi-managed local Postgres data directory (gitignored
 ## Prerequisites
 
 - [Pixi](https://pixi.sh) (already used to provision Mojo v1.0 GA here)
-- Node.js/npm (for the React frontend build)
 
 Everything else — the Mojo compiler, the Python interpreter the backend uses
-for interop, and Postgres itself (server + client driver) — is installed by
-Pixi from `pixi.toml`. No Docker and no system-wide Postgres install: a
-local instance is initialized under `data/pgdata/` and started automatically
-by the tasks below (see `scripts/pg_local.sh`).
+for interop, Postgres itself (server + client driver), and Bun (the runtime
+that builds the Next.js frontend) — is installed by Pixi from `pixi.toml`.
+No Docker, no system-wide Postgres install, and no separate Node.js/npm: a
+local Postgres instance is initialized under `data/pgdata/` and started
+automatically by the tasks below (see `scripts/pg_local.sh`).
 
 ## Run it
 
 ```bash
-pixi run frontend-install   # once
-pixi run frontend-build     # rebuild after any frontend change
+pixi run frontend-install   # once — bun install
+pixi run frontend-build     # rebuild after any frontend change — Next.js static export to frontend/out/
 pixi run playwright-install # once — downloads the Chromium binary used by the JS-rendering fallback
 pixi run serve              # starts the local Postgres instance (first run: initializes it), then the backend at http://localhost:8000
 ```
