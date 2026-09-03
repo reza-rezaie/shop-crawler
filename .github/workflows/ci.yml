@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 jobs:
   ci:
@@ -18,10 +18,8 @@ jobs:
         with:
           cache: true
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
+      # No Node.js setup step: the frontend toolchain is Bun, provisioned
+      # by pixi from pixi.toml (setup-pixi's lockfile cache covers it).
 
       # Runs the same checks `pixi run ci` runs locally: native-Mojo tests,
       # frontend lint, frontend build. See pixi.toml.

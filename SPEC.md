@@ -24,9 +24,9 @@ fixing a reported bug.
 ```
 ┌─────────────────────┐      HTTP (localhost)      ┌───────────────────────────────┐
 │  React frontend      │ ─────────────────────────▶ │  backend/server.py             │
-│  (Vite, static build)│ ◀───────────────────────── │  Thin Python HTTP shim         │
-└─────────────────────┘        JSON / static files   │  (http.server, stdlib only)    │
-                                                       │                                 │
+│  (Next.js static     │ ◀───────────────────────── │  Thin Python HTTP shim         │
+│   export, Bun-built) │        JSON / static files   │  (http.server, stdlib only)    │
+└─────────────────────┘                              │                                 │
                                                        │  routes /api/* to ──────┐       │
                                                        └──────────────────────────┼───────┘
                                                                                   ▼
@@ -55,7 +55,7 @@ fixing a reported bug.
                                                        └───────────────────────────────┘
 ```
 
-Two processes only: the static-built React app served as files, and a single
+Two processes only: the statically-exported React app served as files, and a single
 Python process whose job is to (a) speak raw HTTP and (b) call into Mojo. All
 routing decisions still happen in Python (it owns the socket), but every
 request handler immediately delegates to a Mojo function that does the actual
@@ -120,7 +120,7 @@ All under `http://localhost:8000`, served by `backend/server.py`:
 | GET    | `/api/products`      | Query params: `search`, `category`, `source_host`, `min_price`, `max_price`, `page`, `page_size`. Returns `{items, total, page, page_size}`; each item includes `source_host` (the site it was crawled from, derived from `source_listing_url`). |
 | GET    | `/api/categories`    | Distinct non-null categories currently in the DB, for the filter dropdown. |
 | GET    | `/api/sources`       | Distinct source-site hosts currently in the DB, for the site filter dropdown. |
-| GET    | `/` and static paths | Serves the built React app from `frontend/dist`. |
+| GET    | `/` and static paths | Serves the Next.js static export from `frontend/out` (SPA fallback to `index.html` for unknown non-`/api` paths). |
 
 The crawl endpoint is intentionally synchronous (simple architecture for a
 POC): it blocks until the crawl finishes, capped at `max_pages` (default 3,
@@ -268,7 +268,7 @@ out — it exists because Mojo 1.0 GA has no mature HTTP *server* library
 1.0 GA compiler — verified during setup). It is intentionally minimal: parse
 the request line/query string/body, call one `api.*` Mojo function, JSON-encode
 the result, and (for non-`/api` paths) serve static files from
-`frontend/dist`. It contains no product/crawling/filtering logic — that all
+`frontend/out`. It contains no product/crawling/filtering logic — that all
 lives in Mojo and is reached via `import mojo.importer`, which compiles
 `api.mojo` into a real Python extension module (Mojo's official
 `PythonModuleBuilder` mechanism) rather than shelling out or reimplementing
@@ -294,18 +294,22 @@ Conda packages — the Python interpreter that ships as part of the
 5. `mojo_src/crawler.mojo` + `api.mojo` — orchestration and the Python-facing
    surface.
 6. `backend/server.py` — HTTP routing shim + static file serving.
-7. `frontend/` — Vite + React app: URL input + crawl button, product grid,
-   search box, category/price filters, click-through to original product
-   page.
+7. `frontend/` — Next.js + React app (App Router, static export): URL input
+   + crawl button, product grid, search box, category/price filters,
+   click-through to original product page.
 8. End-to-end run against `https://books.toscrape.com`, re-crawl to verify
    upsert (no duplicates), README with run instructions.
 
 ### Assumptions made without asking
-- **React via Vite**, not Next.js: this POC has no server-side rendering or
-  routing needs — it's one page talking to a local JSON API — so plain
-  React keeps the stack simpler while still matching "React" in the
-  preferred stack. Vite's static `dist/` build is served directly by the
-  Python shim, avoiding a second server/CORS setup.
+- **Next.js, static export only** (was "React via Vite, not Next.js" —
+  changed by `openspec/changes/.../crw-0003`). Still no server-side
+  rendering: `output: 'export'` emits a static `out/` build that the
+  Python shim serves directly, avoiding a second server/CORS setup, so
+  the two-process architecture above is unchanged. Next.js replaces Vite
+  for its App Router structure; **Bun** replaces npm/Node.js as the
+  toolchain (pixi-provisioned, so there is no separate frontend
+  prerequisite). `next dev` proxies `/api` to the backend via
+  `next.config.js` `rewrites()`.
 - **Synchronous crawl endpoint** with page/detail-fetch caps, rather than a
   background job queue — simplest thing that works for a POC against a
   small test site.

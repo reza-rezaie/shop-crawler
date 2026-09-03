@@ -27,7 +27,8 @@ DATA_DIR = PROJECT_ROOT / "data"
 # by scripts/activate.sh to the pixi-managed local instance (see
 # scripts/pg_local.sh). DB_NAME just says which database on that instance.
 DB_NAME = os.environ.get("PGDATABASE", "products")
-STATIC_DIR = PROJECT_ROOT / "frontend" / "dist"
+# The Next.js static export (`bun run build` in frontend/, output: 'export').
+STATIC_DIR = PROJECT_ROOT / "frontend" / "out"
 
 HOST = os.environ.get("HOST", "0.0.0.0")
 if "--port" in sys.argv:
@@ -156,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
                 404,
                 {
                     "error": "Frontend build not found. Run `pixi run frontend-install` "
-                    "then `pixi run frontend-build` first."
+                    "then `pixi run frontend-build` (Next.js static export via Bun) first."
                 },
             )
             return
@@ -180,6 +181,9 @@ def _guess_content_type(path: Path) -> str:
         ".svg": "image/svg+xml",
         ".png": "image/png",
         ".ico": "image/x-icon",
+        # Next.js static export emits an index.txt (RSC payload) alongside
+        # index.html.
+        ".txt": "text/plain; charset=utf-8",
     }.get(ext, "application/octet-stream")
 
 
